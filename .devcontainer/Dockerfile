@@ -10,13 +10,12 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive && \
     apt-get install -y wget libgtk-3-0 libarchive13 build-essential
 
 # Download UnitySetup to the temp directory
-RUN wget -O /tmp/UnitySetup https://download.unity3d.com/download_unity/${UNITY_DOWNLOAD_HASH}/UnitySetup-${UNITY_VERSION} && \
-    chmod +x /tmp/UnitySetup
-
+RUN wget -O /tmp/UnitySetup https://download.unity3d.com/download_unity/${UNITY_DOWNLOAD_HASH}/UnitySetup-${UNITY_VERSION}
+RUN chmod +x /tmp/UnitySetup
 RUN mkdir /opt/unity
 
-# Run UnitySetup in unattended mode with desired components, and accept the ToS
-#RUN yes | /tmp/UnitySetup --unattended --install-location=/opt/unity --components=Unity,Android
+COPY unity_install.sh /tmp/unity_install.sh
 
-# Clean up the installer to save space
-#RUN rm /tmp/UnitySetup
+RUN chmod +x /tmp/unity_install.sh
+
+RUN /tmp/unity_install.sh

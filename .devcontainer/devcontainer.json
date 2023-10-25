@@ -1,5 +1,8 @@
 {
-    "build": { "dockerfile": "Dockerfile" },
+    "build": { 
+        "dockerfile": "Dockerfile",
+        "context": "."
+    },
     "features": {
         "ghcr.io/devcontainers/features/desktop-lite:1": {
             "password": "vscode_salt"
