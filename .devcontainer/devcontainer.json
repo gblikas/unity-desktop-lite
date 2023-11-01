@@ -1,17 +1,17 @@
 {
     "build": { 
         "dockerfile": "Dockerfile",
-        "context": "."
-    },
-    "features": {
-        "ghcr.io/devcontainers/features/desktop-lite:1": {
-            "password": "vscode_salt"
+        "context": ".",
+        "args": {
+            "UNITY_PASSWORD": "${localEnv:UNITY_PASSWORD}",
+            "UNITY_USERNAME": "${localEnv:UNITY_USERNAME}",
+            "UNITY_SERIAL": "${localEnv:UNITY_SERIAL}",
+            "UNITY_ULF": "${localEnv:UNITY_ULF}"
         }
     },
-    "forwardPorts": [6080],
-    "portsAttributes": {
-        "6080": { "label": "desktop" }
-    },
+    "runArgs": ["--init"],
+    "forwardPorts": [6080, 5901],
+    "overrideCommand": false,
     "customizations": {
         "vscode": {
             "extensions": ["ms-azuretools.vscode-docker", "GitHub.copilot"]
