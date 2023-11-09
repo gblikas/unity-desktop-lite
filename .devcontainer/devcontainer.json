@@ -5,8 +5,7 @@
         "args": {
             "UNITY_PASSWORD": "${localEnv:UNITY_PASSWORD}",
             "UNITY_USERNAME": "${localEnv:UNITY_USERNAME}",
-            "UNITY_SERIAL": "${localEnv:UNITY_SERIAL}",
-            "UNITY_ULF": "${localEnv:UNITY_ULF}"
+            "UNITY_SERIAL": "${localEnv:UNITY_SERIAL}"
         }
     },
     "runArgs": ["--init"],
