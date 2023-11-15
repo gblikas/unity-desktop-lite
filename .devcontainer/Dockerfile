@@ -1,5 +1,5 @@
 # Use a base image with necessary dependencies for Unity
-FROM mcr.microsoft.com/vscode/devcontainers/javascript-node:0-18
+FROM mcr.microsoft.com/devcontainers/base:ubuntu
 
 ##################################################################
 # install noVNC, as per https://github.com/devcontainers/features/blob/main/src/desktop-lite/install.sh
@@ -31,8 +31,13 @@ ENV UNITY_PASSWORD=${UNITY_PASSWORD}
 ARG UNITY_SERIAL=${UNITY_SERIAL:-"serial"}
 ENV UNITY_SERIAL=${UNITY_SERIAL}
 
+RUN echo "UNITY_USERNAME=${UNITY_USERNAME}"
+RUN echo "UNITY_PASSWORD=${UNITY_PASSWORD}"
+RUN echo "UNITY_SERIAL=${UNITY_SERIAL}"
+
 COPY unity-activate-license.sh /tmp/unity-activate-license.sh
 RUN chmod +x /tmp/unity-activate-license.sh
+RUN /tmp/unity-activate-license.sh
 
 ##################################################################
 # terminal settings and prefs
@@ -49,6 +54,6 @@ ENV DBUS_SESSION_BUS_ADDRESS="autolaunch:" \
     DISPLAY=":1" \
     LANG="en_US.UTF-8" \
     LANGUAGE="en_US.UTF-8"
-ENTRYPOINT ["/usr/local/share/desktop-init.sh" ]
-CMD ["sleep", "infinity"]
+ENTRYPOINT ["/usr/local/share/desktop-init.sh"]
+CMD ["/bin/bash", "-c", "/tmp/unity-installer.sh && sleep infinity"]
 

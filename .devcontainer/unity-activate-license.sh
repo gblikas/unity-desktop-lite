@@ -22,30 +22,25 @@ if [ -z "${UNITY_INSTALL_DIR}" ]; then
 fi
 
 # required to make sure the variables are exported to the terminal
-echo "export UNITY_USERNAME=${UNITY_USERNAME}" >> /etc/profile.d/unity_envs.sh
-echo "export UNITY_PASSWORD=${UNITY_PASSWORD}" >> /etc/profile.d/unity_envs.sh
-echo "export UNITY_SERIAL=${UNITY_SERIAL}" >> /etc/profile.d/unity_envs.sh
-chmod +x /etc/profile.d/unity_envs.sh
-
-echo "User: $(whoami), Group: $(groups)"
+echo "export UNITY_USERNAME=${UNITY_USERNAME}" >> /etc/profile.d/unity_activate_license.sh
+echo "export UNITY_PASSWORD=${UNITY_PASSWORD}" >> /etc/profile.d/unity_activate_license.sh
+echo "export UNITY_SERIAL=${UNITY_SERIAL}" >> /etc/profile.d/unity_activate_license.sh
 
 # remove all licenses
-"${UNITY_INSTALL_DIR}/Editor/Unity" \
+echo "${UNITY_INSTALL_DIR}/Editor/Unity \
         -quit \
         -batchmode \
         -returnlicense \
         -username ${UNITY_USERNAME} \
         -password ${UNITY_PASSWORD} \
-        -logFile -
+        -logFile -" >> /etc/profile.d/unity_activate_license.sh
 
-sleep 10
-
-# activate license for codespace-<machine> 
-"${UNITY_INSTALL_DIR}/Editor/Unity" \
+echo "${UNITY_INSTALL_DIR}/Editor/Unity \
         -quit \
         -batchmode \
         -nographics \
         -serial ${UNITY_SERIAL} \
         -username ${UNITY_USERNAME} \
         -password ${UNITY_PASSWORD} \
-        -logFile -
+        -logFile -" >> /etc/profile.d/unity_activate_license.sh
+chmod +x /etc/profile.d/unity_activate_license.sh
