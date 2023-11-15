@@ -240,14 +240,6 @@ if [ "${INSTALL_NOVNC}" = "true" ] && [ ! -d "/usr/local/novnc" ]; then
     sed -i -E 's/^python /python3 /' /usr/local/novnc/websockify-${WEBSOCKETIFY_VERSION}/run
 fi
 
-# Install Unity
-echo "unity setup"
-yes | /tmp/UnitySetup --unattended --install-location=/opt/unity --components=Unity,Android
-echo "done unity setup"
-
-# turn off bell sound
-echo "set bell-style none" >> /etc/inputrc
-
 # Set up folders for scripts and init files
 mkdir -p /var/run/dbus /usr/local/etc/vscode-dev-containers/
 
