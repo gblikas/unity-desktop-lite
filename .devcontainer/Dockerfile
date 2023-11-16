@@ -37,7 +37,6 @@ RUN echo "UNITY_SERIAL=${UNITY_SERIAL}"
 
 COPY unity-activate-license.sh /tmp/unity-activate-license.sh
 RUN chmod +x /tmp/unity-activate-license.sh
-RUN /tmp/unity-activate-license.sh
 
 ##################################################################
 # terminal settings and prefs
@@ -55,5 +54,5 @@ ENV DBUS_SESSION_BUS_ADDRESS="autolaunch:" \
     LANG="en_US.UTF-8" \
     LANGUAGE="en_US.UTF-8"
 ENTRYPOINT ["/usr/local/share/desktop-init.sh"]
-CMD ["/bin/bash", "-c", "/tmp/unity-installer.sh && sleep infinity"]
+CMD ["sleep", "infinity"]
 
