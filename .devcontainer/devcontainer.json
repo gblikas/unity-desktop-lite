@@ -8,7 +8,6 @@
             "UNITY_SERIAL": "${localEnv:UNITY_SERIAL}"
         }
     },
-    "postCreateCommand": "/bin/bash -c /tmp/unity-activate-license.sh",
     "runArgs": ["--init"],
     "forwardPorts": [6080, 5901],
     "overrideCommand": false,

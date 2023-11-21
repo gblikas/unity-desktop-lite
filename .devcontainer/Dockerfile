@@ -20,6 +20,7 @@ ENV UNITY_INSTALL_DIR=${UNITY_INSTALL_DIR}
 ##################################################################
 COPY unity-installer.sh /tmp/unity-installer.sh
 RUN chmod +x /tmp/unity-installer.sh
+RUN /tmp/unity-installer.sh
 
 ##################################################################
 # activate Unity license
@@ -37,6 +38,7 @@ RUN echo "UNITY_SERIAL=${UNITY_SERIAL}"
 
 COPY unity-activate-license.sh /tmp/unity-activate-license.sh
 RUN chmod +x /tmp/unity-activate-license.sh
+RUN /tmp/unity-activate-license.sh
 
 ##################################################################
 # terminal settings and prefs
