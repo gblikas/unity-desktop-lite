@@ -27,20 +27,20 @@ echo "export UNITY_PASSWORD=${UNITY_PASSWORD}" >> /etc/profile.d/unity_activate_
 echo "export UNITY_SERIAL=${UNITY_SERIAL}" >> /etc/profile.d/unity_activate_license.sh
 
 # remove all licenses
-echo "${UNITY_INSTALL_DIR}/Editor/Unity \
+${UNITY_INSTALL_DIR}/Editor/Unity \
         -quit \
         -batchmode \
         -returnlicense \
         -username ${UNITY_USERNAME} \
         -password ${UNITY_PASSWORD} \
-        -logFile -" >> /etc/profile.d/unity_activate_license.sh
+        -logFile -
 
-echo "${UNITY_INSTALL_DIR}/Editor/Unity \
+${UNITY_INSTALL_DIR}/Editor/Unity \
         -quit \
         -batchmode \
         -nographics \
         -serial ${UNITY_SERIAL} \
         -username ${UNITY_USERNAME} \
         -password ${UNITY_PASSWORD} \
-        -logFile -" >> /etc/profile.d/unity_activate_license.sh
+        -logFile -
 chmod +x /etc/profile.d/unity_activate_license.sh
