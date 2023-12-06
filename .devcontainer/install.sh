@@ -375,8 +375,8 @@ fi
 
 # Run unity
 log "Start installing Unity" 
-/tmp/unity-installer.sh
-/tmp/unity-activate-license.sh
+sudoIf /tmp/unity-installer.sh
+sudoIf /tmp/unity-activate-license.sh
 log "Done installing Unity
 
 # Run whatever was passed in
