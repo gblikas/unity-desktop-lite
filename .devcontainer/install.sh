@@ -447,7 +447,6 @@ ${UNITY_INSTALL_DIR}/Editor/Unity \
         -username ${UNITY_USERNAME} \
         -password ${UNITY_PASSWORD} \
         -logFile -
-
 ${UNITY_INSTALL_DIR}/Editor/Unity \
         -quit \
         -batchmode \
@@ -456,7 +455,6 @@ ${UNITY_INSTALL_DIR}/Editor/Unity \
         -username ${UNITY_USERNAME} \
         -password ${UNITY_PASSWORD} \
         -logFile -
-chmod +x /etc/profile.d/unity_activate_license.sh
 EOF
 
 
