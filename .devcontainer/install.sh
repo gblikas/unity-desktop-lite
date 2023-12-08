@@ -280,6 +280,52 @@ fi
 echo -e "\nSuccess!\n"
 EOF
 
+cat << EOF > /tmp/unity-activate-license.sh
+#!/bin/bash
+
+if [ -z "\${UNITY_USERNAME}" ]; then
+    echo "UNITY_USERNAME is not set"
+    exit 1
+fi
+
+if [ -z "\${UNITY_PASSWORD}" ]; then
+    echo "UNITY_PASSWORD is not set"
+    exit 1
+fi
+
+if [ -z "\${UNITY_SERIAL}" ]; then
+    echo "UNITY_SERIAL is not set"
+    exit 1
+fi
+
+if [ -z "\${UNITY_INSTALL_DIR}" ]; then
+    echo "UNITY_INSTALL_DIR is not set"
+    exit 1
+fi
+
+# required to make sure the variables are exported to the terminal
+echo "export UNITY_USERNAME=\${UNITY_USERNAME}" >> /etc/profile.d/unity_activate_license.sh
+echo "export UNITY_PASSWORD=\${UNITY_PASSWORD}" >> /etc/profile.d/unity_activate_license.sh
+echo "export UNITY_SERIAL=\${UNITY_SERIAL}" >> /etc/profile.d/unity_activate_license.sh
+
+# remove all licenses
+\${UNITY_INSTALL_DIR}/Editor/Unity \
+        -quit \
+        -batchmode \
+        -returnlicense \
+        -username \${UNITY_USERNAME} \
+        -password \${UNITY_PASSWORD} \
+        -logFile -
+\${UNITY_INSTALL_DIR}/Editor/Unity \
+        -quit \
+        -batchmode \
+        -nographics \
+        -serial \${UNITY_SERIAL} \
+        -username \${UNITY_USERNAME} \
+        -password \${UNITY_PASSWORD} \
+        -logFile -
+EOF
+
 # Container ENTRYPOINT script
 cat << EOF > /usr/local/share/desktop-init.sh
 #!/bin/bash
@@ -379,88 +425,8 @@ exec "\$@"
 log "** SCRIPT EXIT **"
 EOF
 
-cat << EOF > /tmp/unity-installer.sh
-#!/bin/bash
-set -e -x
-
-# check if UNITY_DOWNLOAD_HASH is set and if not, error
-if [ -z ${UNITY_DOWNLOAD_HASH} ]; then
-    echo "UNITY_DOWNLOAD_HASH is unset"
-    exit 1
-fi
-
-# check if UNITY_VERSION is set and if not, error
-if [ -z ${UNITY_VERSION} ]; then
-    echo "UNITY_VERSION is unset"
-    exit 1
-fi
-
-if [ -z ${UNITY_INSTALL_DIR} ]; then
-    echo "UNITY_INSTALL_DIR is unset"
-    exit 1
-fi
-
-UNITY_SETUP_URL=https://download.unity3d.com/download_unity/${UNITY_DOWNLOAD_HASH}/UnitySetup-${UNITY_VERSION}
-UNITY_SETUP_TMP=/tmp/UnitySetup
-
-wget -O ${UNITY_SETUP_TMP} ${UNITY_SETUP_URL}
-chmod +x ${UNITY_SETUP_TMP}
-mkdir -p ${UNITY_INSTALL_DIR}
-yes | ${UNITY_SETUP_TMP} --unattended --install-location=${UNITY_INSTALL_DIR} --components=Unity,Android
-chmod -R a+rx ${UNITY_INSTALL_DIR}/Editor/Unity
-EOF
-
-cat << EOF > /tmp/unity-activate-license.sh
-#!/bin/bash
-set -x
-
-if [ -z "${UNITY_USERNAME}" ]; then
-    echo "UNITY_USERNAME is not set"
-    exit 1
-fi
-
-if [ -z "${UNITY_PASSWORD}" ]; then
-    echo "UNITY_PASSWORD is not set"
-    exit 1
-fi
-
-if [ -z "${UNITY_SERIAL}" ]; then
-    echo "UNITY_SERIAL is not set"
-    exit 1
-fi
-
-if [ -z "${UNITY_INSTALL_DIR}" ]; then
-    echo "UNITY_INSTALL_DIR is not set"
-    exit 1
-fi
-
-# required to make sure the variables are exported to the terminal
-echo "export UNITY_USERNAME=${UNITY_USERNAME}" >> /etc/profile.d/unity_activate_license.sh
-echo "export UNITY_PASSWORD=${UNITY_PASSWORD}" >> /etc/profile.d/unity_activate_license.sh
-echo "export UNITY_SERIAL=${UNITY_SERIAL}" >> /etc/profile.d/unity_activate_license.sh
-
-# remove all licenses
-${UNITY_INSTALL_DIR}/Editor/Unity \
-        -quit \
-        -batchmode \
-        -returnlicense \
-        -username ${UNITY_USERNAME} \
-        -password ${UNITY_PASSWORD} \
-        -logFile -
-${UNITY_INSTALL_DIR}/Editor/Unity \
-        -quit \
-        -batchmode \
-        -nographics \
-        -serial ${UNITY_SERIAL} \
-        -username ${UNITY_USERNAME} \
-        -password ${UNITY_PASSWORD} \
-        -logFile -
-EOF
-
-
 echo "${VNC_PASSWORD}" | vncpasswd -f > /usr/local/etc/vscode-dev-containers/vnc-passwd
 chmod +x /usr/local/share/desktop-init.sh \
-    /tmp/unity-installer.sh \
     /tmp/unity-activate-license.sh \
     /usr/local/bin/set-resolution
 

@@ -26,6 +26,10 @@ COPY install.sh /tmp/install.sh
 RUN chmod +x /tmp/install.sh 
 RUN /tmp/install.sh
 
+COPY unity-install.sh /tmp/unity-install.sh
+RUN chmod +x /tmp/unity-install.sh
+RUN /tmp/unity-install.sh
+
 ##################################################################
 # terminal settings and prefs
 ##################################################################
@@ -41,6 +45,6 @@ ENV DBUS_SESSION_BUS_ADDRESS="autolaunch:" \
     DISPLAY=":1" \
     LANG="en_US.UTF-8" \
     LANGUAGE="en_US.UTF-8"
-ENTRYPOINT ["/usr/local/share/desktop-init.sh", "/tmp/unity-installer.sh", "/tmp/unity-activate-license.sh"]
-CMD ["sleep", "infinity"]
+ENTRYPOINT ["/usr/local/share/desktop-init.sh"]
+CMD ["/tmp/unity-activate-license.sh", "sleep", "infinity"]
 
