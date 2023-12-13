@@ -280,49 +280,52 @@ fi
 echo -e "\nSuccess!\n"
 EOF
 
-cat << EOF > /tmp/unity-activate-license.sh
+cat << EOF > /home/${USERNAME}/unity-activate-license.sh
 #!/bin/bash
+set -x
 
-if [ -z "\${UNITY_USERNAME}" ]; then
+if [ -z "${UNITY_USERNAME}" ]; then
     echo "UNITY_USERNAME is not set"
     exit 1
 fi
 
-if [ -z "\${UNITY_PASSWORD}" ]; then
+if [ -z "${UNITY_PASSWORD}" ]; then
     echo "UNITY_PASSWORD is not set"
     exit 1
 fi
 
-if [ -z "\${UNITY_SERIAL}" ]; then
+if [ -z "${UNITY_SERIAL}" ]; then
     echo "UNITY_SERIAL is not set"
     exit 1
 fi
 
-if [ -z "\${UNITY_INSTALL_DIR}" ]; then
+if [ -z "${UNITY_INSTALL_DIR}" ]; then
     echo "UNITY_INSTALL_DIR is not set"
     exit 1
 fi
 
 # required to make sure the variables are exported to the terminal
-echo "export UNITY_USERNAME=\${UNITY_USERNAME}" >> /etc/profile.d/unity_activate_license.sh
-echo "export UNITY_PASSWORD=\${UNITY_PASSWORD}" >> /etc/profile.d/unity_activate_license.sh
-echo "export UNITY_SERIAL=\${UNITY_SERIAL}" >> /etc/profile.d/unity_activate_license.sh
+echo "export UNITY_USERNAME=${UNITY_USERNAME}" >> /etc/profile.d/unity_activate_license.sh
+echo "export UNITY_PASSWORD=${UNITY_PASSWORD}" >> /etc/profile.d/unity_activate_license.sh
+echo "export UNITY_SERIAL=${UNITY_SERIAL}" >> /etc/profile.d/unity_activate_license.sh
+chmod +x /etc/profile.d/unity_activate_license.sh
 
 # remove all licenses
-\${UNITY_INSTALL_DIR}/Editor/Unity \
+${UNITY_INSTALL_DIR}/Editor/Unity \
         -quit \
         -batchmode \
         -returnlicense \
-        -username \${UNITY_USERNAME} \
-        -password \${UNITY_PASSWORD} \
+        -username ${UNITY_USERNAME} \
+        -password ${UNITY_PASSWORD} \
         -logFile -
-\${UNITY_INSTALL_DIR}/Editor/Unity \
+
+${UNITY_INSTALL_DIR}/Editor/Unity \
         -quit \
         -batchmode \
         -nographics \
-        -serial \${UNITY_SERIAL} \
-        -username \${UNITY_USERNAME} \
-        -password \${UNITY_PASSWORD} \
+        -serial ${UNITY_SERIAL} \
+        -username ${UNITY_USERNAME} \
+        -password ${UNITY_PASSWORD} \
         -logFile -
 EOF
 
@@ -419,6 +422,11 @@ else
     log "noVNC is already running or not installed."
 fi
 
+log "[$(whoami)] Activating Unity license."
+log "Current user ${USERNAME}."
+sudo -u vscode /home/${USERNAME}/unity-activate-license.sh
+log "Unity license activated."
+
 # Run whatever was passed in
 log "Executing \"\$@\"."
 exec "\$@"
@@ -426,9 +434,7 @@ log "** SCRIPT EXIT **"
 EOF
 
 echo "${VNC_PASSWORD}" | vncpasswd -f > /usr/local/etc/vscode-dev-containers/vnc-passwd
-chmod +x /usr/local/share/desktop-init.sh \
-    /tmp/unity-activate-license.sh \
-    /usr/local/bin/set-resolution
+chmod +x /usr/local/share/desktop-init.sh /home/${USERNAME}/unity-activate-license.sh /usr/local/bin/set-resolution
 
 # Set up fluxbox config
 copy_fluxbox_config "/root"

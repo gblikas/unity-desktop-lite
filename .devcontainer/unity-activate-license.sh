@@ -1,6 +1,8 @@
 #!/bin/bash
 set -x
 
+echo "Executing as user: $(whoami)"
+
 if [ -z "${UNITY_USERNAME}" ]; then
     echo "UNITY_USERNAME is not set"
     exit 1
@@ -25,6 +27,7 @@ fi
 echo "export UNITY_USERNAME=${UNITY_USERNAME}" >> /etc/profile.d/unity_activate_license.sh
 echo "export UNITY_PASSWORD=${UNITY_PASSWORD}" >> /etc/profile.d/unity_activate_license.sh
 echo "export UNITY_SERIAL=${UNITY_SERIAL}" >> /etc/profile.d/unity_activate_license.sh
+chmod +x /etc/profile.d/unity_activate_license.sh
 
 # remove all licenses
 ${UNITY_INSTALL_DIR}/Editor/Unity \
@@ -43,4 +46,3 @@ ${UNITY_INSTALL_DIR}/Editor/Unity \
         -username ${UNITY_USERNAME} \
         -password ${UNITY_PASSWORD} \
         -logFile -
-chmod +x /etc/profile.d/unity_activate_license.sh
