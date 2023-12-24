@@ -30,6 +30,10 @@ COPY unity-install.sh /tmp/unity-install.sh
 RUN chmod +x /tmp/unity-install.sh
 RUN /tmp/unity-install.sh
 
+COPY unity-activate-license.sh /tmp/unity-activate-license.sh
+RUN chmod +x /tmp/unity-activate-license.sh
+RUN /tmp/unity-activate-license.sh
+
 ##################################################################
 # terminal settings and prefs
 ##################################################################

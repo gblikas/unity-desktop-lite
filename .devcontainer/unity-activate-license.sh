@@ -1,7 +1,23 @@
 #!/bin/bash
-set -x
 
-echo "Executing as user: $(whoami)"
+USERNAME="${USERNAME:-"${_REMOTE_USER:-"automatic"}"}"
+if [ "${USERNAME}" = "auto" ] || [ "${USERNAME}" = "automatic" ]; then
+    USERNAME=""
+    POSSIBLE_USERS=("vscode" "node" "codespace" "$(awk -v val=1000 -F ":" '$3==val{print $1}' /etc/passwd)")
+    for CURRENT_USER in "${POSSIBLE_USERS[@]}"; do
+        if id -u ${CURRENT_USER} > /dev/null 2>&1; then
+            USERNAME=${CURRENT_USER}
+            break
+        fi
+    done
+    if [ "${USERNAME}" = "" ]; then
+        USERNAME=root
+    fi
+elif [ "${USERNAME}" = "none" ] || ! id -u ${USERNAME} > /dev/null 2>&1; then
+    USERNAME=root
+fi
+
+echo "username: $(whoami) | USERNAME: ${USERNAME} | hostname: $(hostname)"
 
 if [ -z "${UNITY_USERNAME}" ]; then
     echo "UNITY_USERNAME is not set"
@@ -23,14 +39,10 @@ if [ -z "${UNITY_INSTALL_DIR}" ]; then
     exit 1
 fi
 
-# required to make sure the variables are exported to the terminal
-echo "export UNITY_USERNAME=${UNITY_USERNAME}" >> /etc/profile.d/unity_activate_license.sh
-echo "export UNITY_PASSWORD=${UNITY_PASSWORD}" >> /etc/profile.d/unity_activate_license.sh
-echo "export UNITY_SERIAL=${UNITY_SERIAL}" >> /etc/profile.d/unity_activate_license.sh
-chmod +x /etc/profile.d/unity_activate_license.sh
+set -x
 
 # remove all licenses
-${UNITY_INSTALL_DIR}/Editor/Unity \
+sudo -u ${USERNAME} ${UNITY_INSTALL_DIR}/Editor/Unity \
         -quit \
         -batchmode \
         -returnlicense \
@@ -38,7 +50,7 @@ ${UNITY_INSTALL_DIR}/Editor/Unity \
         -password ${UNITY_PASSWORD} \
         -logFile -
 
-${UNITY_INSTALL_DIR}/Editor/Unity \
+sudo -u ${USERNAME} ${UNITY_INSTALL_DIR}/Editor/Unity \
         -quit \
         -batchmode \
         -nographics \
