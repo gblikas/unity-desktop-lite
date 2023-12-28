@@ -1,0 +1,27 @@
+{
+    "id": "unity-license-activate",
+    "name": "unity-license-activate",
+    "version": "0.0.0",
+    "options": {
+        "unity_username": {
+            "type": "string",
+            "default": ""
+        },
+        "unity_password": {
+            "type": "string",
+            "default": ""
+        },
+        "unity_serial": {
+            "type": "string",
+            "default": ""
+        },
+        "unity_install_dir": {
+            "type": "string",
+            "default": "/opt/unity"
+        },
+        "vnc_password": {
+            "type": "string",
+            "default": "vscode"
+        }
+    }
+}

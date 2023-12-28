@@ -1,0 +1,20 @@
+{
+    "image": "ghcr.io/gblikas/unity-desktop-lite/unity-2022/2022.3.11f1:latest",
+    "features": {
+        "./local-features/unity-license-activate": {
+            "unity_password": "${localEnv:UNITY_PASSWORD}",
+            "unity_username": "${localEnv:UNITY_USERNAME}",
+            "unity_serial": "${localEnv:UNITY_SERIAL}",
+            "vnc_password": "${localEnv:VNC_PASSWORD}"
+        }
+    },
+    "forwardPorts": [6080, 5901],
+    "customizations": {
+        "vscode": {
+            "extensions": ["ms-azuretools.vscode-docker", "GitHub.copilot"]
+        }
+    },
+    "hostRequirements": {
+        "cpus": 8
+    }
+}

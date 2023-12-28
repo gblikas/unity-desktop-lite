@@ -1,0 +1,9 @@
+{
+    "build": { 
+        "dockerfile": "Dockerfile",
+        "context": "."
+    },
+    "runArgs": ["--init", "--shm-size=6gb"],
+    "forwardPorts": [6080, 5901],
+    "overrideCommand": false
+}
