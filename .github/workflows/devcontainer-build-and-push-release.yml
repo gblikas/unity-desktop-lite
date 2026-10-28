@@ -48,6 +48,13 @@ jobs:
             echo "subfolder=${{ matrix.directory }}" >> "$GITHUB_OUTPUT"
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
+      - name: free disk space
+        if: steps.check_diff_changes.outputs.changed == 'true'
+        run: |
+          # The Unity layer is about 8.7 GB uncompressed and needs roughly twice that to build and export.
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          docker image prune --all --force
+          df -h /
       - name: ${{ matrix.directory }} - prebuild unity
         id: prebuild_unity
         uses: devcontainers/ci@v0.3
