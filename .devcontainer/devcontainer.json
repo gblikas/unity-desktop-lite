@@ -5,13 +5,13 @@
             "unity_password": "${localEnv:UNITY_PASSWORD}",
             "unity_username": "${localEnv:UNITY_USERNAME}",
             "unity_serial": "${localEnv:UNITY_SERIAL}",
-            "vnc_password": "${localEnv:VNC_PASSWORD}"
+            "vnc_password": "${localEnv:VNC_PASSWORD:vscode}"
         }
     },
     "forwardPorts": [6080, 5901],
     "customizations": {
         "vscode": {
-            "extensions": ["ms-azuretools.vscode-docker", "GitHub.copilot"]
+            "extensions": ["ms-azuretools.vscode-containers", "GitHub.copilot-chat"]
         }
     },
     "hostRequirements": {

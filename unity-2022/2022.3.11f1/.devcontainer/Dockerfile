@@ -1,4 +1,6 @@
-FROM mcr.microsoft.com/devcontainers/base:ubuntu
+# Pinned to Ubuntu 22.04: the floating `base:ubuntu` tag now resolves to Ubuntu 26.04,
+# where this image no longer builds and Unity 2022.3 cannot start.
+FROM mcr.microsoft.com/devcontainers/base:3-jammy
 
 ENV UNITY_VERSION="2022.3.11f1"
 ENV UNITY_DOWNLOAD_HASH="d00248457e15"

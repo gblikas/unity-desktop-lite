@@ -44,22 +44,22 @@ if [ -z "${UNITY_INSTALL_DIR}" ]; then
     exit 1
 fi
 
-set -x
+# Do not enable xtrace (set -x) here: it prints the Unity password and serial to the build log.
 
-# remove all licenses
-sudo -u ${USERNAME} ${UNITY_INSTALL_DIR}/Editor/Unity \
+# return the license activated on this machine, if any (a no-op in a freshly built container)
+sudo -u "${USERNAME}" "${UNITY_INSTALL_DIR}/Editor/Unity" \
         -quit \
         -batchmode \
         -returnlicense \
-        -username ${UNITY_USERNAME} \
-        -password ${UNITY_PASSWORD} \
+        -username "${UNITY_USERNAME}" \
+        -password "${UNITY_PASSWORD}" \
         -logFile -
 
-sudo -u ${USERNAME} ${UNITY_INSTALL_DIR}/Editor/Unity \
+sudo -u "${USERNAME}" "${UNITY_INSTALL_DIR}/Editor/Unity" \
         -quit \
         -batchmode \
         -nographics \
-        -serial ${UNITY_SERIAL} \
-        -username ${UNITY_USERNAME} \
-        -password ${UNITY_PASSWORD} \
+        -serial "${UNITY_SERIAL}" \
+        -username "${UNITY_USERNAME}" \
+        -password "${UNITY_PASSWORD}" \
         -logFile -
