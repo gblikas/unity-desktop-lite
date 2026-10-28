@@ -4,233 +4,273 @@ This roadmap follows from the [October 2026 assessment](./assessment-2026-10.md)
 
 - smoother onboarding;
 - more Unity versions;
-- how the project compares with other solutions;
-- MCP/AI support, so an agent can capture the diffs.
+- how other solutions compare, and whether Unity has built something better;
+- MCP/AI support so an agent can capture the diffs.
 
-It also takes into account that Unity and others have shipped related tools since 2023.
+It is a proposal: the decisions in [Decisions for the owner](#decisions-for-the-owner) come first. It was revised after a completeness critique and three adversarial reviews.
 
-## Where to aim
+**Capacity assumption.** One part-time maintainer, about 6 focused hours a week. Estimates are in focused hours. At that pace the core (Phases 0-1) is roughly 2-4 months, and Stage A of the AI work another 1-2 months.
 
-**From** "a PM viewer for Unity scenes in a codespace" **to** "open a pull request's Unity project in a real Editor in the browser, together with an AI agent, and put the evidence (semantic diff plus before/after images) on the PR."
+*Nothing here is legal advice. Where Unity's terms matter, the plan says what to ask Unity.*
 
-Why:
+## Decide first: how big should this be? (D0)
 
-- **The PM-viewer niche is being taken.**
-  - Unity Production Pipeline web gives non-Editor users browser previews of a repo's assets (public from November 2026).
-  - PrefabLens shows semantic prefab and scene diffs inside GitHub PRs for free.
-  - Both avoid this project's two biggest frictions: a roughly 10-minute boot, and a paid Unity seat for every viewer.
-- **What nobody offers yet:**
-  - a disposable, PR-scoped, full-fidelity Editor that runs wherever the dev container spec runs, including for projects older than Unity 6;
-  - that same Editor shared by a human and an AI agent;
-  - rendered before/after images of changed scenes and prefabs posted on the PR.
+| Option | What it means | Upkeep |
+|---|---|---|
+| **A. A small, maintained template** (recommended) | One dev container setup that installs the Editor your project uses, activates your own license at start-up, gives you a browser desktop, and adds license-free diff tools for people and agents. | A few hours a month: keep up with Unity releases, base images and the desktop feature. |
+| B. A platform | Everything in A, plus published templates, a PR bot that renders before/after images in CI, Editor-driving MCP and a version matrix. | Much more. It also adds legal and security surface: CI seats, untrusted PR code, agents. |
+| C. Archive | Point people to GameCI, the desktop-lite feature, the Unity CLI, Unity Production Pipeline and PrefabLens. | None. |
 
-Personas, in priority order:
+Option A answers all four asks within a fixed budget. B's extra pieces depend on answers from Unity (see [Questions for Unity](#questions-to-ask-unity-in-writing)) and on spikes that may fail. C is the honest fallback if the Phase 0 gates fail.
 
-1. **Reviewers and tech leads** who need to *see* a scene or prefab change without switching branches locally. They already have seats.
-2. **AI agents** (Claude Code, Copilot and others) reviewing or working on Unity PRs. They need structured diffs, images, and sometimes a live Editor.
-3. **PMs, artists and QA.** Still supported, but the README should point them to Unity Production Pipeline (if they use Unity Cloud) or PrefabLens for quick looks, and here when they need full fidelity (and have a seat).
+## Who it is for
 
-Design principles:
+- **The original intent** was PMs and coders reviewing Unity changes from a PR without a local clone.
+- **The evidence from the 18 forks** is different:
+  - several dropped to 4-core machines;
+  - several replaced the private image, removed the license feature, or self-built another 2022.3 version;
+  - one followed README step 3 and was left with no way to get the Editor;
+  - one fork belongs to a school.
 
-- **Ship installers and configuration, not Unity binaries.** Each user downloads the Editor from Unity and accepts Unity's terms.
-- **Secrets only at runtime.** Never in a Dockerfile, a feature, a prebuild, or a log.
-- **License-free by default.** Do as much as possible from the files in git; start the Editor only when needed.
-- **Stay on the dev container spec.** The same config should run on Codespaces, Ona, Coder, the DevPod fork, and local Docker.
-- **Build on maintained pieces:** the desktop-lite feature, GameCI images, the Unity CLI, and PrefabLens. Re-implement nothing they already do.
+  The people who actually showed up look like **hobbyists and students**: Free GitHub accounts, Personal or Student Unity licenses, no local Unity install.
+- **Studio PMs** need their own Unity seat to open the Editor here (or floating licenses). Unity Production Pipeline (if they are on Unity Cloud and Unity 6) or PrefabLens may serve them better for a quick look.
+- **AI agents** benefit most from *license-free* diffs of Unity files. Driving the Editor is where Unity's 2026 Terms bite.
 
-## Phase 0: Unblock and stop the leaks (days)
+**Recommendation (D2):** design for "anyone who needs a Unity Editor in a browser, with their own license": students, hobbyists, small teams, and reviewers away from their workstation. Then add PR-review and AI conveniences on top. Validate this before investing: ask the issue #3 reporter and the fork owners what they use it for.
 
-**Done in this branch:**
+**What the project can honestly claim:**
 
-- [x] Pin the base image to `mcr.microsoft.com/devcontainers/base:3-jammy`. The floating `ubuntu` tag is now 26.04, where the build fails and Unity 2022.3 cannot run. *Merging this rebuilds the image, because the Dockerfile changed.*
-- [x] Remove `set -x` from the license feature and quote all credential arguments.
-- [x] Make `VNC_PASSWORD` really optional: `${localEnv:VNC_PASSWORD:vscode}`.
-- [x] CI: `$GITHUB_OUTPUT` instead of `::set-output`, an explicit `permissions` block, `actions/checkout@v7`, `docker/login-action@v4`.
-- [x] Update the VS Code extension IDs (`ms-azuretools.vscode-containers`, `GitHub.copilot-chat`).
-- [x] README corrections: plan names, config path, `-projectPath`, the credential-handling FAQ, the prebuild caveat, typos, links.
+- your project, in the real Unity Editor, in a browser;
+- any Editor version (including 2021.3/2022.3);
+- on any dev container host (Codespaces, Ona, Coder, local Docker);
+- open source;
+- your own account and seat.
 
-**Still to do:**
+**What it should not claim:**
 
-1. **Decide how users get the Editor (decision D1 below), then answer issue #3.** Today only the owner can pull the image.
-   - *Stopgap:* make the package public (Package settings → Change visibility; this cannot be undone), add `LABEL org.opencontainers.image.source="https://github.com/gblikas/unity-desktop-lite"` to the Dockerfile, and publish a versioned tag (for example `:2022.3.11f1-<sha>`) besides `:latest`.
-   - *Recommended:* skip publishing Editor images and go straight to Phase 1/2. Until then, tell users how to build the image themselves, and keep the `unity-*` and `.github` folders instead of deleting them.
-2. **Move license activation to runtime.** This removes the remaining credential leak (the dev container CLI prints every feature option), makes Codespaces secrets and prebuilds work as GitHub documents, and keeps license files out of image layers. Sketch:
+- "full fidelity". Rendering is in software with no GPU. URP and Built-in use llvmpipe; HDRP needs Vulkan (lavapipe) and is untested.
+- "nobody else does this". This is absence of evidence, and Unity is moving quickly.
 
-   ```jsonc
-   // .devcontainer/devcontainer.json (consumer)
-   {
-     "image": "…",
-     "secrets": {                       // Codespaces prompts for these on the create page
-       "UNITY_USERNAME": { "description": "Unity ID email used to activate the Editor" },
-       "UNITY_PASSWORD": { "description": "Unity ID password; read at container start, never logged" },
-       "UNITY_SERIAL":   { "description": "Serial key; leave empty for named-user (assigned) seats" }
-     },
-     "postStartCommand": "bash .devcontainer/unity-license.sh activate",
-     "runArgs": ["--shm-size=2g"],      // runArgs are not inherited from the image
-     "init": true,
-     "forwardPorts": [6080],
-     "portsAttributes": { "6080": { "label": "Unity desktop (noVNC)", "onAutoForward": "openBrowser" } },
-     "hostRequirements": { "cpus": 4 }
-   }
-   ```
+## Phase 0: Make it work again, safely (10-20 h remaining)
 
-   `unity-license.sh` should:
-   - read credentials from the environment;
-   - never enable xtrace;
-   - build the command with a bash array;
-   - pass `-serial` with no key when `UNITY_SERIAL` is empty (named-user seats);
-   - write Unity's log to a mode-600 file;
-   - skip activation if a license file already exists;
-   - print a clear "add these secrets" message instead of failing when credentials are missing;
-   - provide a `return` sub-command for freeing the seat.
-3. **Credential hygiene for past users.** If the old flow ran with real credentials and creation logs were shared or kept, rotate the Unity password and remove stale activations at id.unity.com → My Seats.
+### Done in this branch
 
-*Done when:* a non-owner creates a working codespace by following the README; a canary secret never appears in creation or prebuild logs; and a prebuild succeeds.
+- [x] **Pinned base image.** `devcontainers/base:3-jammy`: the floating `ubuntu` tag is now 26.04, where the build fails and Unity 2022.3 cannot start.
+  - The full Dockerfile (UnitySetup with Unity + Android) now builds end to end on it; tested up to image export, which ran out of this sandbox's disk.
+- [x] **No Trash leftovers in the image.** UnitySetup moves its temporary files (~630 MB) to the Trash, so they are now deleted in the same `RUN`.
+- [x] **CI frees runner disk before building.** The Unity layer is ~8.7 GB uncompressed.
+- [x] **Runtime license activation.** The local feature now installs a `unity-license` helper and runs it in `postStartCommand`, reading `UNITY_*` from the environment.
+  - Credentials are no longer feature options, so:
+    - nothing reaches the build log;
+    - nothing can execute through the dev container CLI's env file;
+    - prebuilds can work.
+  - `unity-license return` frees the seat, and `status` reports state.
+  - `VNC_PASSWORD` is applied at start; TigerVNC picks it up without a restart.
+  - Tested with a stand-in Unity binary and real TigerVNC ([assessment §4.3](./assessment-2026-10.md#43-this-branchs-runtime-activation)).
+- [x] **Consumer config.** A `secrets` block (Codespaces prompts for these), `"init": true` and `--shm-size=6gb` (which the published image's config never passed on).
+- [x] **CI and extensions.** `$GITHUB_OUTPUT`, an explicit `permissions` block, `checkout@v7`, `login-action@v4`. Stale VS Code extension entries removed.
+- [x] **README.** Known issues (private image, seat return, no GPU), a self-build workaround for issue #3, accurate credential and licensing text, and a not-legal-advice note.
 
-## Phase 1: Smoother onboarding (1-2 weeks)
+### To do
 
-**Goal:** add one file to an existing Unity repo, set secrets once, click a badge, and a browser tab opens with the Unity Editor and the project already loaded.
+0. **Confirm which Unity license you can test with.** A Pro seat, or Personal? Every later gate depends on it. If you have no seat this flow can activate, say so in the README rather than promise paid-seat support.
+1. **Merge safely.**
+   - Open a PR from this branch. The `pull_request` run builds the full image but cannot publish (`push: filter` only publishes on pushes to `main`).
+   - In the package settings, check that *Manage Actions access* lists this repository with *Write*. Nobody can tell whether the 2023 workflow ever published, because its run history has been deleted.
+   - Tag the current image as a rollback point: `docker buildx imagetools create -t ghcr.io/gblikas/unity-desktop-lite/unity-2022/2022.3.11f1:2023-12 ghcr.io/gblikas/unity-desktop-lite/unity-2022/2022.3.11f1:latest`.
+   - Merge with *squash* or a *merge commit*. With *rebase*, the `HEAD^` change check may skip the rebuild.
+2. **Reply on issue #3.** The package is private. The README's self-build option is the workaround, and an install-from-Unity option is planned. **Do not make the package public**: Unity's terms grant no right to redistribute the Editor, and public visibility cannot be undone.
+3. **Time-boxed spikes in a real codespace** (about a day each), which decide gate G1:
+   - **(a) License.** Try 2022.3.62f3 and 6000.3 with a Pro serial, a named-user seat (`-serial` without a key) and Personal.
+     - Personal can go through the Unity CLI's `unity auth login` then `unity license activate`, or Unity Hub inside the desktop. The Hub needs `--no-sandbox`, a non-snap browser and a `unityhub://` handler.
+     - Unity's 2026-09 support article says Editors up to 2022.3 launched without the Hub may not load newer manual named-user licenses; test Licensing Client 1.18.3 if so.
+     - Check accounts with 2FA. Never advise disabling 2FA.
+   - **(b) Time to first scene.** Use a real URP project on 4-core and 8-core machines, with no cached `Library/`. Then try an HDRP sample with `mesa-vulkan-drivers` and `-force-vulkan`.
+   - **(c) Seat accounting.** Does an activation survive stop/start? Does a rebuild (home is wiped) consume a new one? Do not try to reuse machine identities to save seats; that may breach the Terms.
+4. **README "Use something else when…".** Unity Production Pipeline for browsing a Unity 6 project on Unity Cloud; the PrefabLens CLI for "what changed?"; a local worktree if you already have a seat and a warm `Library/`. The content is in [assessment §8](./assessment-2026-10.md#8-alternatives-better-worse-or-complementary).
+5. **Decide D6 (license) and D7 (naming) now, before publishing anything.** Relicensing is easy while you are the only author. Unity's trademark guidelines discourage "Unity" in product names, which is cheap to fix before packages exist and costly after.
 
-1. **Publish a feature,** `ghcr.io/gblikas/unity-desktop-lite/features/unity-desktop`, using [`devcontainers/action`](https://github.com/devcontainers/action). It replaces `.devcontainer/local-features`. Its contents:
-   - runtime license activation (from Phase 0);
-   - a launcher that finds `ProjectSettings/ProjectVersion.txt`, refuses to auto-open on an Editor/project version mismatch (Unity would upgrade the assets), and starts `Unity -projectPath …`;
-   - noVNC auto-connect, via a `defaults.json` with `autoconnect`/`resize: remote`, which needs noVNC 1.6 or later;
-   - a `unity-doctor` script that checks CPU/RAM/disk/`/dev/shm`, display and noVNC, which secrets are present (names only), license state and version match;
-   - Fluxbox menu items: *Open project*, *Doctor*, *Return license*.
-2. **Compose maintained features** instead of vendoring:
-   - `ghcr.io/devcontainers/features/desktop-lite:1` with `password: noPassword`. The port stays private behind GitHub authentication; or set a password at runtime.
-   - `ghcr.io/devcontainers/features/git-lfs:1`, since most Unity repos use LFS.
-   - Then delete the copied 400-line `install.sh`.
-3. **Publish a template,** `ghcr.io/gblikas/unity-desktop-lite/templates/unity-codespace`, with options for the Unity version and project path. Users can then use VS Code's *Add Dev Container Configuration Files…* or `devcontainer templates apply`. Submit the collection to the [containers.dev index](https://containers.dev/collections), which currently has no Unity entries.
-4. **README, badge first.** Add a `codespaces.new` deep link with `devcontainer_path` and a suggested machine, the recommended secrets, a cost table (Free accounts get 120 core-hours a month: 30 h on 4-core, 15 h on 8-core), troubleshooting, and "when to use something else".
-5. **Defaults:** `hostRequirements.cpus: 4` as the minimum, with 8 recommended through the deep link; `--shm-size=2g`; `init: true`; do not forward 5901 by default.
-6. **Personal-license spike.** Try Unity Hub sign-in inside the noVNC desktop (the only path Unity documents) and the Unity CLI (`unity auth login`, then `unity license activate`, beta). If either works in Codespaces, document it as the free "try it" path.
-7. **Tests in CI:**
-   - `devcontainer features test` scenarios (`3-jammy` + 2022.3, `3-noble` + 6000.3);
-   - smoke checks: noVNC answers, `Unity -version` runs, the launcher finds a fixture project;
-   - a **canary test** that fails if a dummy secret appears in any build log.
+**Gate G1 (end of Phase 0):**
 
-*Done when:* a first-time user needs at most 3 clicks plus build time, never types a port or VNC password, and gets an actionable message for missing secrets, an exhausted seat limit, or a version mismatch.
+- If no license path works in a codespace, stop the Editor work. Keep the license-free diff tools (Stage A below) and point users to alternatives.
+- If time to first scene is far worse than switching branches locally, aim at people without a local install (students, hobbyists), not at reviewers who already have a seat and a warm `Library/`.
 
-## Phase 2: Any Unity version (1-2 weeks, can overlap Phase 1)
+## Phase 1: The right Editor for your project, in one click (40-80 h)
 
-**Recommendation: install the Editor with a feature, not with one prebuilt image per version.**
+1. **Install the Editor the project uses**, instead of publishing one image per version.
+   - **Version.** Read `ProjectSettings/ProjectVersion.txt`; `m_EditorVersionWithRevision` holds both the version and the changeset. Validate both against strict patterns (`^[0-9]{4}\.[0-9]+\.[0-9]+[abfp][0-9]+$`, `^[0-9a-f]{12}$`) before using them, because the file is PR-controlled.
+   - **Installer.** Prefer Unity's own CLI (`unity install <version> --changeset <cs>`, beta). Fall back to the documented `LinuxEditorInstaller/Unity-<version>.tar.xz`, checked against the md5 in `unity-<version>-linux.ini`.
+   - **Scope.** Editor only by default. Other modules (Android, Windows, macOS) are `.pkg` archives that need Unity's installer.
+   - **Unity's terms.** Never accept them on the user's behalf. Use an explicit `acceptUnityTerms` option, or leave Unity's own dialog to the user. Drop `yes |`.
+   - **When.** Run it in `onCreateCommand`, where the workspace exists and prebuilds capture the result. Re-check in `postCreateCommand`, removing the old Editor before installing another.
+   - **Base image.** `3-jammy` for 2021.3/2022.3; `3-noble` (or jammy) for Unity 6.
+   - **Disk and time.**
 
-- **Feature `unity-editor`.** Its `version` option accepts:
-  - an exact version (`6000.3.27f1`);
-  - a stream alias (`6000.3`, `2022.3`, `lts`, `latest`), resolved with the [Unity release API](https://services.api.unity.com/unity/editor/release/v1/releases?version=6000&limit=25);
-  - `auto`, which reads `ProjectSettings/ProjectVersion.txt`. That file already contains the changeset, for example `m_EditorVersionWithRevision: 6000.0.52f1 (9e4086222921)`.
-- **Install.**
-  - Download `https://download.unity3d.com/download_unity/<changeset>/LinuxEditorInstaller/Unity-<version>.tar.xz`. This pattern answered for every release sampled, from 2018.4 to the 7000.x alphas, and the release API lists a Linux x86_64 tarball for each release.
-  - Verify the md5 published in `unity-<version>-linux.ini`.
-  - Extract with `xz -T0`.
-  - Install the Editor only by default; `.tar.xz` modules are optional.
-  - This drops the undocumented GTK3 `UnitySetup` installer.
-- **`auto` mode.** Install in `onCreateCommand`, where the workspace is available and prebuilds capture the result. Re-check in `postCreateCommand` for PR branches that change the Unity version.
-- **Base image per family.**
-  - `3-jammy` for 2021.3/2022.3 (in practice; Unity lists only 18.04/20.04 for 2022.3).
-  - `3-noble` or `3-jammy` for 6000.x (officially supported).
-  - Never the floating `ubuntu` tag.
-- **Optional fast base.**
-  - GameCI `unityci/editor:ubuntu-<version>-base-3.2.2`, plus `common-utils` (non-root user) and `desktop-lite`. This combination ran the GUI in our test.
-  - The feature detects the preinstalled Editor and skips the download.
-  - Caveats: Docker Hub rate limits, Ubuntu 22.04 only, images run as root.
-- **CI.**
-  - A scheduled job regenerates `versions.json` from the release API and opens a PR.
-  - A weekly matrix tests the newest patch of each supported stream: 6000.3 LTS, 6000.6, and 2022.3.62f3 as legacy.
-  - PRs run two smoke scenarios.
-- **Optional private warm images.** A reusable `workflow_call` workflow lets an organization build a **private** prebuilt image for its version with the same feature.
-- **Later:** switch the download step to `unity install <version> --download-directory` once the Unity CLI is generally available.
+     | | Installed | Download | Extraction |
+     |---|---|---|---|
+     | 2022.3 | 6.4-7.5 GB | 3-4.6 GB | single-threaded |
+     | Unity 6 | 8.5-9.2 GB | 3-4.6 GB | multi-threaded only with xz ≥ 5.4 (noble) |
 
-Why this design:
+     Stream the download rather than storing the tarball. Refuse to install when free space is short. Recommend 8-core / 64 GB machines for real projects.
+2. **Desktop.**
+   - Move to `ghcr.io/devcontainers/features/desktop-lite:1` (noVNC 1.6+), but note upstream issue #1168: its `password` option is not enforced, so access control then rests on Codespaces port privacy alone. Either keep VNC authentication (set `VNC_PASSWORD` in `containerEnv` or keep a custom entrypoint), or document plainly that the desktop is protected only by private ports. Add a test that reads the RFB security types on port 5901.
+   - 24-bit colour.
+   - `portsAttributes` 6080 → `openBrowser`, plus an `index.html` that redirects to `vnc.html?autoconnect=true&resize=remote`.
+   - `otherPortsAttributes: ignore`.
+   - Warn never to make 6080 public or organization-visible.
+3. **Launcher.** Wait for the activation-done flag and the X display. Then start `Unity -projectPath …` with `nohup setsid`; processes started directly from a lifecycle command are killed when it ends. Refuse to open a project whose Editor version doesn't match, since Unity would upgrade its assets.
+4. **README quick start.**
+   - A `codespaces.new/OWNER/REPO` badge. It opens the options page, where recommended secrets are shown.
+   - The secrets list.
+   - Costs, compute **and** storage: Free accounts get 120 core-hours (15 h on 8 cores) and only 15 GB-month of storage, while a Unity codespace is 15-30 GB.
+   - Seat lifecycle: one long-lived codespace per person rather than one per PR; `unity-license return` before deleting.
+   - Known limits: no GPU, and Unity doesn't support containers.
+5. **Publish the feature** (and the editor installer) to GHCR with `devcontainers/action`.
+   - Set each package to **public** once. These are config-only, with no Unity binaries.
+   - Add a CI check that every published artifact resolves anonymously.
+   - Test on PRs with a stub `Unity`, as this branch's tests did, plus a canary-secret check. Run a real Editor install monthly or manually.
 
-- no Unity binaries are redistributed;
-- new Unity releases, Unity 7 included, need no code changes;
-- the Editor matches `ProjectVersion.txt` exactly;
-- it works with prebuilds.
+**Deferred** until users ask:
 
-The trade-off: without a prebuild, the first codespace downloads 3-4.6 GB, about the same as pulling today's image.
+- a published template and a containers.dev listing;
+- desktop menu items;
+- GameCI images as a fast base (the user's own choice; caveats: redistribution, root user, Docker Hub limits, needs `remoteUser`);
+- `lts`/`latest` aliases;
+- a generated `versions.json`;
+- private warm images;
+- floating licenses. These need `services-config.json` and network reach to an on-premises Licensing Server; document them as community-supported.
 
-**Support policy:**
+## Phase 2: AI, so agents can capture the diff, license-free first (20-40 h for Stage A)
 
-- *Tier 1:* currently supported Unity streams, with the full feature set (including the official Unity CLI/MCP, which needs Unity 6).
-- *Tier 2:* 2021.3 and 2022.3. Install, view and community MCP, best effort.
-- Linux x86_64 only; Unity ships no Linux arm64 Editor, so Apple Silicon local Docker is not supported.
+### Stage A: works for every Unity version, needs no Unity license (do first)
 
-## Phase 3: MCP/AI, so agents can capture the diff (2-4 weeks, staged)
+1. **Diff tools in the image.**
+   - The PrefabLens CLI, version-pinned with a sha256. It is non-Unity software, so it is clearly outside §17.2(ff). Its `--json` mode diffs two git refs with GUIDs resolved.
+   - Optionally the Unity CLI's `vcs diff/summarize/affected` (needs Force Text serialization), once it is confirmed not to need sign-in and Unity's position on automated use is clear.
+2. **Agent instructions.** An `AGENTS.md` or Claude Code skill: "to see what changed in a scene or prefab between two refs, run …". Any agent that can run shell commands can then capture diffs, with no new server.
+3. **`editor_screenshot`**. `import -window root -display :1` lets an agent see the same desktop as the human, in the user's own codespace and under their own seat. Combined with switching refs, this gives before/after views without CI rendering.
+4. **Optional thin MCP server** wrapping 1-3, read-only, configured in a project `.mcp.json` / `.vscode/mcp.json`. Register Claude Code in a feature `postCreateCommand` as the remote user, not at build time. The Copilot cloud agent ignores dev container features; it needs its repository MCP settings and `copilot-setup-steps.yml`.
+5. **PR comment Action, same-repo PRs first.**
+   - It posts the semantic summary plus a `codespaces.new/OWNER/REPO/pull/<n>` link.
+   - It treats PR content as untrusted: escape names, cap length, keep permissions minimal, and never give an LLM step a write token.
+   - Fork PRs come later, through `workflow_run`, handling the artifact strictly as data.
+   - Compare refs (`merge-base..head`), never the working tree. The Editor rewrites `packages-lock.json` and `ProjectSettings`.
 
-### Stage A: license-free, every Unity version (do first)
+### Agent safety (applies to every stage)
 
-1. **`unity-diff`**, a small CLI and MCP server with read-only tools:
+- Codespaces exports `UNITY_USERNAME`/`UNITY_PASSWORD`/`UNITY_SERIAL` into every VS Code terminal, so any agent or MCP server started there can read them.
+  - Strip them in agent and MCP launch wrappers: `env -u UNITY_PASSWORD -u UNITY_SERIAL …`.
+  - Recommend a dedicated Unity ID for codespaces, and named-user seats over serials.
+- Keep tools read-only by default. Require human confirmation for anything that changes files or drives the Editor.
+- Opening a PR's project runs code the PR author wrote: `[InitializeOnLoad]`, package dependencies, analyzers, asset postprocessors. Never open untrusted PRs with secrets present.
+- Document which data goes where: YAML and screenshots to the model provider, assets to Unity Cloud if you use Production Pipeline. Studios can then approve each flow.
 
-   | Tool | Input | Output |
-   |---|---|---|
-   | `list_changed_unity_assets` | `base`, `head` | Changed `.unity`/`.prefab`/`.asset`/`.mat`/... paired with their `.meta`, plus LFS flags |
-   | `semantic_diff` | `path`, `base`, `head` | GameObject, component and property changes and prefab overrides, as JSON or markdown |
-   | `resolve_reference` | `guid`, `ref` | Asset path (looked up via `.meta` at that ref) |
-   | `pr_report` | `base`, `head` | Markdown summary for bots and humans |
+### Stage B: rendered before/after images in CI (spike only, gated)
 
-   - **Engine:** PrefabLens `--json`, with a pinned version and checksum. Alternatively the Unity CLI's `vcs diff` once it is GA and confirmed not to need sign-in. A small Python fallback covers the rest.
-   - **Why YAML, not raw diffs:** Unity YAML (fileIDs, stripped placeholders, `m_Modifications`) makes raw diffs misleading. A prototype turned 63 changed lines into 4 semantic changes.
-   - **Packaging:** ship it as a dev container feature that registers the MCP server for VS Code (`customizations.vscode.mcp`), Claude Code (`claude mcp add --scope user`) and the Copilot agent.
-2. **PR bot** (GitHub Action). On PRs that touch Unity YAML, it posts or updates one comment with the semantic summary and an "Open this PR in a browser Unity Editor" codespace link. It needs no secrets and no Unity. For PRs from forks, post through a `workflow_run` follow-up.
-3. **Zero-effort win now:** point reviewers to the PrefabLens Chrome extension.
+Do not build this until all three hold:
 
-### Stage B: visual evidence (needs the Editor, a license and software OpenGL)
+1. **A license.** Unity confirms in writing which license covers CI rendering. A seat is for one person, the Build License excludes "creating", and Build Server covers builds.
+2. **Unity's position on automation.** Unity's answer on §17.2(ff) for batchmode automation.
+3. **A passing spike.** Render a URP sample scene at two refs on a hosted runner, with a warm `Library/`, in about 20 minutes, with acceptable quality. HDRP needs lavapipe.
 
-4. **Spike.** Render a prefab and a scene with `-batchmode`, *without* `-nographics`, under Xvfb with Mesa llvmpipe, on 2022.3 and 6000.3. Check image quality (URP/HDRP) and timing. `-nographics` produces no images.
-5. **Tools `render_snapshot(asset, ref)` and `visual_diff(asset, base, head)`.**
-   - A small C# Editor helper renders the scene or prefab, auto-framed, at base and at head.
-   - ImageMagick produces a diff image and a side-by-side.
-   - The images are added to the PR comment, hosted on an orphan branch or as artifacts.
-6. **Security.**
-   - Opening a PR in Unity runs code the PR author wrote (`[InitializeOnLoad]`), so render only same-repo PRs, or after a maintainer adds a label.
-   - Use a dedicated CI seat and always return it.
-   - Never combine `pull_request_target` with a checkout of the PR head.
-7. **Terms.** Unity's 2026-06-30 Terms restrict automated and agent access to "Authorized Agentic Access". Before shipping Editor-driving automation, get Unity's position on it, or route it through Unity's own CLI (`unity open --batchmode`, then `unity command`) on Unity 6 projects.
+If it goes ahead:
 
-### Stage C: a live Editor for agents in the codespace (opt-in)
+- only same-repo PRs;
+- one serialized job, with the seat returned under `if: always()`;
+- the render job holds no write token;
+- never `pull_request_target` combined with a checkout of the PR head.
 
-8. **`editor_screenshot()`** captures the VNC desktop (xdotool and ImageMagick on `DISPLAY=:1`), so an agent sees what the human sees.
-9. **Unity 6+:** preconfigure the Unity CLI's `unity mcp` with `com.unity.pipeline` (official, free, still beta). Do not build on the AI Assistant's in-Editor MCP server; Unity deprecated it.
-10. **2021.3/2022.3:** optionally add [CoplayDev/unity-mcp](https://github.com/CoplayDev/unity-mcp) (MIT, supports 2021.3+), injected as an embedded package so the project's manifest and diff stay clean. Keep it opt-in because of the Terms question.
+### Stage C: an Editor-driving MCP (deferred)
 
-*Done when:* an agent in a codespace can answer "what changed in `Level01.unity` in this PR, and what does it look like?" with structured data and before/after images, and the PR comment appears within minutes of a push.
+- **Unity 6+:** Unity's own `unity mcp` with `com.unity.pipeline`, for the seat holder, in their own codespace, with clients Unity documents. Wait until the CLI is generally available.
+- **2021.3/2022.3:** community bridges (CoplayDev, IvanMurzak) drive the Editor without Unity's authorization (§17.2(gg)). Wait for Unity's vetting.
+  - If you do use one, keep it out of the project diff: add the package folder to `.git/info/exclude` and mark `Packages/packages-lock.json` skip-worktree for the session.
 
-## Phase 4: Reach and upkeep (ongoing)
+## Phase 3: Reach (optional, ongoing)
 
-- Lead the README with the reviewer-and-agent story. Add a "use something else when…" section (Unity Production Pipeline, PrefabLens, GameCI).
-- Use Dependabot for GitHub Actions, dev container features (with a committed `devcontainer-lock.json`) and the Docker base.
-- Replace the 17 MB GIF with a short video of the new flow.
-- Replace the default issue templates (the bug template asks about smartphones) with fields that matter: Unity version, host, machine type, and a redacted creation-log excerpt.
-- Consider a permissive license (MIT or Apache-2.0) for the features and templates. They get copied into proprietary game repositories, where GPL-3.0 may deter adoption. Get advice; this is not legal advice.
-- Re-evaluate positioning when Unity Production Pipeline (November 2026) and the Unity CLI reach general availability.
+- Templates and a containers.dev listing.
+- Other hosts (Ona, Coder, local Docker with a mode-600 env file). The `secrets` prompt only exists in Codespaces.
+- GPU hosts.
+- KasmVNC or Selkies instead of noVNC.
+- Issue templates with useful fields: Unity version, host, machine type, redacted creation log.
+- A new demo video instead of the 17 MB GIF.
+- Re-evaluate when Unity Production Pipeline (November 2026) and the Unity CLI reach general availability.
 
 ## Decisions for the owner
 
-| # | Decision | Options | Recommendation |
-|---|---|---|---|
-| D1 | How users get the Unity Editor | (a) make the GHCR image public; (b) install from Unity's CDN with a feature; (c) use GameCI images as the base | **(b)** as the backbone, (c) as an optional fast path. (a) only as a stopgap, accepting that Unity's terms do not clearly permit redistributing the Editor. |
-| D2 | Primary persona | PMs; reviewers/developers; AI agents | Reviewers and agents first. Send PMs to Unity Production Pipeline or PrefabLens unless they need full fidelity. |
-| D3 | Unity versions | which streams | 6000.3 LTS as the default, 6000.6 as latest, 2022.3.62f3 as legacy. Drop 2022.3.11f1. |
-| D4 | License types | Pro serial or named-user; floating; Personal | All three. Personal depends on the Phase 1 spike. |
-| D5 | AI scope under Unity's Terms | file-only; Editor-driving | File-only by default; Editor-driving opt-in after clarifying with Unity or via the Unity CLI. |
-| D6 | Repository license | keep GPL-3.0; permissive for features and templates | Consider permissive for anything users copy into their repos. |
+| # | Decision | Recommendation |
+|---|---|---|
+| D0 | Scope: template, platform or archive | **Template** (option A), with gate G1 after Phase 0. |
+| D1 | How users get the Unity Editor | **Install it from Unity, per user**: Unity CLI or documented tarball, in the user's own container. Never publish public images containing the Editor, and don't use public-repo prebuilds that copy it to everyone. GameCI bases only as the user's own choice, with the caveats. |
+| D2 | Primary persona | **People who need a browser Editor with their own license** (students, hobbyists, small teams, reviewers away from their workstation). Validate with users first. |
+| D3 | Unity versions | **Whatever `ProjectVersion.txt` says.** Test 6000.3 LTS and 2022.3.62f3. Drop the 2022.3.11f1-only image. |
+| D4 | License types | **Paid seats** (serial or named-user) first. Personal if the Phase 0 spike works. Floating documented as untested. |
+| D5 | AI scope | **File-level diffs and desktop screenshots by default.** Editor-driving tools and CI rendering only after Unity answers in writing. |
+| D6 | Repository license | **Decide now** whether files users copy into their own repos (features, templates) should be MIT or Apache-2.0 instead of GPL-3.0. |
+| D7 | Naming | **Decide before publishing anything** whether to keep "Unity" in package and repository names (Unity's trademark guidelines). |
 
-## Open questions to settle in a real codespace
+## Questions to ask Unity (in writing)
 
-- Do Codespaces user secrets still reach `${localEnv:…}` inside features? GitHub says no; the 2023 demo suggests it once worked. Either way, runtime activation is the documented path.
-- Does `onAutoForward: openBrowser`, combined with noVNC's `defaults.json`, auto-connect through Codespaces' private-port authentication?
-- Does using only the noVNC tab reset the 30-minute idle timeout?
-- How responsive is the Editor on 4 versus 8 cores with software rendering, and how long is the first asset import? `Library/` is not committed, so every new codespace re-imports.
-- Seat counting: does a stopped and restarted codespace keep its activation? Does a stable `/etc/machine-id` help?
-- Does Personal sign-in work inside the container, through the Hub or the CLI?
-- Does `unity vcs diff` need sign-in or a license, and is its JSON output stable?
-- How good is llvmpipe rendering for URP and HDRP projects?
+1. May a seat holder run their own licensed Editor in a cloud dev environment (GitHub Codespaces) and view it through a browser (noVNC)? This concerns Editor Software Terms §2.8, the cloud clause.
+2. Is a scripted install from Unity's CDN acceptable (§17.2(l)), or should installs go through the Unity CLI?
+3. Which license covers rendering scene/prefab previews of PR changes in CI: a seat, the Build License or Build Server?
+4. How do §17.2(ff) and §17.2(gg) apply to:
+   - CLI and batchmode automation of the user's own Editor;
+   - file-only tools;
+   - third-party MCP bridges?
+
+   Which clients are authorized?
+5. May community dev container features and templates include "Unity" in their names?
+
+Separately, ask GameCI whether they hold Unity's permission to distribute Editor images.
+
+## Threat model (summary)
+
+- **Assets to protect:** Unity credentials and seats; the codespace's GitHub token; unreleased game code and art.
+- **Who could misuse them:**
+  - authors of fork PRs;
+  - same-repo collaborators;
+  - prompt-injected agents;
+  - anyone who can reach a public or organization-visible port 6080;
+  - browser extensions holding broad tokens (the PrefabLens extension asks for the classic `repo` scope);
+  - a compromised CI seat.
+- **Rules:**
+  - secrets only at runtime, never in images or logs;
+  - no Editor on untrusted PRs while secrets are present;
+  - agents read-only by default, with credentials stripped;
+  - no LLM step with write tokens reading PR content;
+  - private ports;
+  - data flows documented.
+
+## Success metrics and stop criteria
+
+**Metrics:**
+
+- time from badge click to first scene, with and without a prebuild;
+- activation success rate, and seats left behind per user;
+- issues opened and closed;
+- what the people interviewed say.
+
+**Stop or archive (option C) when any of these holds:**
+
+- gate G1 fails;
+- Unity says cloud-streamed Editors or this kind of automation need a separate grant;
+- Unity Production Pipeline at general availability covers PR review for most users at an acceptable price.
+
+## Open questions
+
+These still need a real codespace or Unity's answer:
+
+- License behaviour of standalone Editors (no Hub) in containers, with 2FA, SSO and the newer license types.
+- Whether Codespaces' creation log redacts secrets. This no longer matters for this branch, but it does for anyone still on the old config.
+- Whether interacting only with the noVNC tab keeps the codespace from idling out (30-minute default).
+- Library import times, and whether Unity Accelerator helps.
+- HDRP on lavapipe.
+- Whether the Unity CLI's `vcs diff` works signed out and on 2022.3 projects.
 
 ## Suggested first week
 
-1. Merge this branch (pinned base, leak and CI fixes, README corrections) and let CI rebuild the image.
-2. Decide D1. Then either flip the package to public and reply on #3, or reply on #3 that a self-build path or feature is coming.
-3. Implement runtime activation (Phase 0, item 2) and test it in a real codespace with a canary secret.
-4. Start the Phase 1 feature and template skeleton with `devcontainers/action`, and the `unity-editor` installer with `version: auto`.
+1. Spend 1-2 hours on the merge steps above: PR run, package access, rollback tag, squash merge. Then reply on #3.
+2. License spike (about 1 day).
+3. Time-to-first-scene spike (about 1 day).
+4. Decide D0, D6 and D7.
