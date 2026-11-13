@@ -1,6 +1,7 @@
 # Project assessment: October 2026
 
-Snapshot of `main` at `1ee7c38` (the repository's only commit, 2023-12-28), assessed on 2026-10-28.
+Snapshot of `main` at `1ee7c38` (then the repository's only commit, 2023-12-28), assessed on 2026-10-28.
+Updated on 2026-11-13 with the results of [pull request #4](https://github.com/gblikas/unity-desktop-lite/pull/4), which fixes part of what is listed here.
 The proposed next steps are in the companion document, [roadmap.md](./roadmap.md).
 
 **Contents**
@@ -23,8 +24,8 @@ The proposed next steps are in the companion document, [roadmap.md](./roadmap.md
 | Question | Answer |
 |---|---|
 | Can a new user get it working today? | **No.** The image the README points to is a **private** GHCR package. Anonymous pulls are refused, and the README's packages link shows "0 packages" to everyone except the owner. That is what [issue #3](https://github.com/gblikas/unity-desktop-lite/issues/3) reports; the owner sees the package only because they are signed in. |
-| Does the image still build? | **No, not as written.** The unpinned base `mcr.microsoft.com/devcontainers/base:ubuntu` now resolves to **Ubuntu 26.04**. The copied desktop script fails there (and on 24.04) at `libasound2`, and Unity 2022.3.11f1 itself cannot start on 26.04. Pinned to Ubuntu 22.04 (this branch), the full Dockerfile builds, including UnitySetup installing Unity and Android, and the Editor starts and reaches Unity's license dialog over noVNC (tested with Docker, see [§4](#4-live-build-and-run-test)). |
-| Is the license flow sound? | **No, and this branch replaces it.** Unity credentials went into a dev container *feature*, which runs at image build time. GitHub documents that Codespaces secrets cannot be used there. A test with the dev container CLI showed the password printed to the build log 3 times per build (5 on failure). A password containing `$(…)` ran as a command as root. Seats were never returned, and the "optional" `VNC_PASSWORD` failed the build when unset. This branch activates at container start instead, and was tested with a stand-in Unity binary ([§4](#4-live-build-and-run-test)). |
+| Does the image still build? | **No, not as written.** The unpinned base `mcr.microsoft.com/devcontainers/base:ubuntu` now resolves to **Ubuntu 26.04**. The copied desktop script fails there (and on 24.04) at `libasound2`, and Unity 2022.3.11f1 itself cannot start on 26.04. Pinned to Ubuntu 22.04 (pull request #4), the full Dockerfile builds, including UnitySetup installing Unity and Android, and the Editor starts and reaches Unity's license dialog over noVNC (tested with Docker, see [§4](#4-live-build-and-run-test)). |
+| Is the license flow sound? | **No, and pull request #4 replaces it.** Unity credentials went into a dev container *feature*, which runs at image build time. GitHub documents that Codespaces secrets cannot be used there. A test with the dev container CLI showed the password printed to the build log 3 times per build (5 on failure). A password containing `$(…)` ran as a command as root. Seats were never returned, and the "optional" `VNC_PASSWORD` failed the build when unset. Pull request #4 activates at container start instead. That was tested with a stand-in Unity binary ([§4](#4-live-build-and-run-test)), not yet with a real Unity seat. |
 | Is it up to date? | **No.** Unity 2022.3 is out of public support, and the pinned patch is 51 patch versions behind the last public 2022.3 release. Unity Plus no longer exists. The copied desktop script is upstream v1.0.7 (January 2023); upstream is v1.2.10. noVNC, websockify, the GitHub Actions and the VS Code extension IDs are years old. |
 | Has someone, or Unity, built something better? | **Partly.** <ul><li>Unity now ships an official **Unity CLI** (beta). It installs any Editor, activates licenses (including Personal), produces semantic scene/prefab diffs (`vcs diff`, `vcs summarize`, `vcs affected`) and runs an MCP server for AI agents (`unity mcp`, Unity 6+ only).</li><li>**Unity Production Pipeline** web (closed beta; public from November 2026) lets people without the Editor browse a GitHub repo's assets. Unity markets "real game renders" and agents working alongside people, though its docs describe the 3D previews as approximations.</li><li>**PrefabLens** shows semantic prefab/scene diffs inside GitHub pull requests.</li><li>We found nothing that posts **rendered before/after images** of changed scenes and prefabs on a PR. Building blocks exist.</li></ul>What remains distinctive about this project: your project in the real Editor (software-rendered, no GPU) in any dev container host, including Unity versions older than 6. Licensing and support constraints apply (see [§9](#9-constraints-any-next-step-must-respect)). |
 
@@ -35,15 +36,15 @@ The rest of this document is the evidence. [roadmap.md](./roadmap.md) turns it i
 | Area | Status | Evidence |
 |---|---|---|
 | A new user can pull the prebuilt image | ❌ | `ghcr.io/gblikas/unity-desktop-lite/unity-2022/2022.3.11f1` answers an anonymous token request with `UNAUTHORIZED: authentication required`, while non-existent sibling paths answer `DENIED`, so the package exists but is private. GHCR makes packages in a personal account private on first publish ([docs](https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility)). Codespaces in this repository can still pull it, because it is linked to the repository, but nobody else can. |
-| The image rebuilds from source | ❌ → ✅ in this branch | `FROM mcr.microsoft.com/devcontainers/base:ubuntu` is now Ubuntu 26.04.1. The tag moved jammy → noble in May 2025 and → 26.04 in April 2026. `apt-get install libasound2` fails with "no installation candidate" on 24.04 and 26.04. The image builds on 22.04. |
+| The image rebuilds from source | ❌ → ✅ in pull request #4 | `FROM mcr.microsoft.com/devcontainers/base:ubuntu` is now Ubuntu 26.04.1. The tag moved jammy → noble in May 2025 and → 26.04 in April 2026. `apt-get install libasound2` fails with "no installation candidate" on 24.04 and 26.04. The image builds on 22.04. |
 | The Unity Editor runs in the desktop | ✅ 22.04 / 24.04, ❌ 26.04 | Up to Unity's license dialog; no project was opened. See [§4](#4-live-build-and-run-test). |
 | Vendor support | ⚠️ | Unity's system requirements say the Editor "is supported on workstations or laptop form factors running without emulation, container, or compatibility layer", with an Nvidia/AMD GPU. 2022.3 lists only Ubuntu 18.04/20.04. Every dev container setup, this one included, is outside Unity's support statement. It works, as tested, but without recourse if Unity changes something. |
-| License activation in Codespaces | ❌ by design → ✅ in this branch | Activation happened in a build-time feature fed by `${localEnv:UNITY_*}`. GitHub says secrets "cannot be used ... during codespace build time ... within a dev container feature", and that prebuilds "cannot use any user-level secrets" ([secrets](https://docs.github.com/en/codespaces/managing-your-codespaces/managing-your-account-specific-secrets-for-github-codespaces), [prebuilds](https://docs.github.com/en/codespaces/prebuilding-your-codespaces/configuring-prebuilds)). This branch activates in `postStartCommand`, which GitHub documents as able to read secrets. |
-| Credential hygiene | ❌ → ✅ in this branch | Before this branch, the dev container CLI echoed every feature option and `set -x` traced the Unity command lines, so the password appeared 3 times per build. Its option env file also executed `$(…)` in values as root, and the file stayed world-readable in the build host's temp directory. The credentials are no longer feature options, so none of this applies now. |
-| Seat usage | ❌ (helper added) | `-returnlicense` ran in a fresh build container, where nothing was activated, so it did nothing. Nothing returns a seat when a codespace is deleted, hence the README's "not enough licenses" FAQ. This branch adds `unity-license return`, which you have to run yourself, since dev containers have no "on delete" hook. |
-| CI | ⚠️ | `::set-output` was deprecated, and `actions/checkout@v4` / `docker/login-action@v3` are node20-era majors (fixed here). The workflow pushes only `:latest`, and only on push to `main`. The `HEAD^` diff gate misses multi-commit pushes. There is no scheduled rebuild for base-image security updates. Run history from 2023 has been deleted under GitHub's retention rules, but a test run on 2026-11-13 (run number 21) confirmed that the workflow's token can write to the package. |
+| License activation in Codespaces | ❌ by design → ⚠️ reworked in pull request #4, not yet tested with a real seat or in a codespace | Activation happened in a build-time feature fed by `${localEnv:UNITY_*}`. GitHub says secrets "cannot be used ... during codespace build time ... within a dev container feature", and that prebuilds "cannot use any user-level secrets" ([secrets](https://docs.github.com/en/codespaces/managing-your-codespaces/managing-your-account-specific-secrets-for-github-codespaces), [prebuilds](https://docs.github.com/en/codespaces/prebuilding-your-codespaces/configuring-prebuilds)). Pull request #4 activates in `postStartCommand`, which GitHub documents as able to read secrets. That this also holds for a `postStartCommand` contributed by a feature follows from the dev container CLI's code; it has not yet been observed in a codespace. |
+| Credential hygiene | ❌ → ✅ in pull request #4 | Before pull request #4, the dev container CLI echoed every feature option and `set -x` traced the Unity command lines, so the password appeared 3 times per build. Its option env file also executed `$(…)` in values as root, and the file stayed world-readable in the build host's temp directory. The credentials are no longer feature options, so none of this applies now. |
+| Seat usage | ❌ (helper added) | `-returnlicense` ran in a fresh build container, where nothing was activated, so it did nothing. Nothing returns a seat when a codespace is deleted, hence the README's "not enough licenses" FAQ. Pull request #4 adds `unity-license return`, which you have to run yourself, since dev containers have no "on delete" hook. |
+| CI | ⚠️ | `::set-output` was deprecated, and `actions/checkout@v4` / `docker/login-action@v3` are node20-era majors (fixed in pull request #4). The workflow publishes only `:latest`, and only on push to `main`; since pull request #4 a manual run can also copy a published tag, which is how the December 2023 image got its `:2023-12` tag. The `HEAD^` diff gate misses multi-commit pushes. There is no scheduled rebuild for base-image security updates. Run history from 2023 has been deleted under GitHub's retention rules, but a test run on 2026-11-13 (run number 21) confirmed that the workflow's token can write to the package. |
 | Unity version | ⚠️ | 2022.3.11f1 (October 2023). The 2022.3 stream is out of support; its last public patch is 2022.3.62f3 (2025-10-28). Players built with 2022.3.11f1 are affected by [CVE-2025-59489](https://unity.com/security/sept-2025-01). |
-| Docs | ⚠️ (fixed here) | The README mentioned Unity Plus, had a wrong config path, used `--projectPath`, said the password is "not retained", called a required secret optional, and had a dangling sentence and typos. |
+| Docs | ⚠️ (fixed in pull request #4) | The README mentioned Unity Plus, had a wrong config path, used `--projectPath`, said the password is "not retained", called a required secret optional, and had a dangling sentence and typos. |
 | Community | ℹ️ | 10 stars, 18 forks, 1 open issue (#3, opened 2026-10-28). |
 
 ## 3. Links and references
@@ -57,7 +58,7 @@ Every URL and external reference in the README and source was checked on 2026-10
 | desktop-lite feature docs | README.md:3 | ✅ Live. But the repo **vendors a 2023 copy** (v1.0.7) of the feature's script instead of using the feature (now v1.2.10). | Use the feature ([roadmap](./roadmap.md)). |
 | Codespaces product page | README.md:5 | ✅ Live. Link text said "codepsace". | Fixed. |
 | Demo GIF | README.md:7 | ✅ Live. 17 MB, and it shows the 2023 setup. | Consider a compressed MP4 later. |
-| `.devcontainer/devcontainer.json` link | README.md:18 | ✅ Live, but the target contradicted "optional" (see D6). | Fixed. |
+| `.devcontainer/devcontainer.json` link | README.md:18 | ✅ Live, but the target contradicted "optional" (see defect D6). | Fixed. |
 | Packages page | README.md:20 | ❌ Shows "0 packages" to anyone but the owner (private package). | Decision D1 in the [roadmap](./roadmap.md#decisions-for-the-owner). |
 | "replace `.devcontainer.json.image`" | README.md:20 | ❌ No such file or key. | Fixed: "the `image` property in `.devcontainer/devcontainer.json`". |
 | `--projectPath` | README.md:30 | ⚠️ Unity documents `-projectPath` (single dash). | Fixed. |
@@ -70,7 +71,7 @@ Every URL and external reference in the README and source was checked on 2026-10
 
 | Reference | Where | Result | Action |
 |---|---|---|---|
-| `ghcr.io/gblikas/unity-desktop-lite/unity-2022/2022.3.11f1:latest` | .devcontainer/devcontainer.json:2 | ❌ Private; only a mutable `:latest` tag. | D1. |
+| `ghcr.io/gblikas/unity-desktop-lite/unity-2022/2022.3.11f1:latest` | .devcontainer/devcontainer.json:2 | ❌ Private; only a mutable `:latest` tag (plus `:2023-12` since 2026-11-13). | Decision D1 in the [roadmap](./roadmap.md#decisions-for-the-owner). |
 | `mcr.microsoft.com/devcontainers/base:ubuntu` | Dockerfile:1 | ❌ Floating; now Ubuntu 26.04. | Fixed: pinned to `3-jammy`. |
 | Upstream desktop-lite `install.sh` link | Dockerfile:8 | ✅ Live. The copy is about 3 years behind. | Replace the copy with the feature. |
 | `go.microsoft.com/fwlink/?linkid=2090316` | install.sh:4 | ✅ Redirects to the MIT LICENSE of `microsoft/vscode-dev-containers` (repo archived 2023-11-30). | None. |
@@ -104,7 +105,7 @@ Run on 2026-10-28 with Docker on amd64. The repo's scripts were used byte-for-by
 
 Also observed:
 
-- **Full Dockerfile, as on this branch** (pinned `3-jammy`, the repo's UnitySetup step with `--components=Unity,Android`). Every build step completed; only the final image export ran out of this sandbox's disk. The Unity layer is about 8.7 GB uncompressed: 6.0 GB of Editor, 2.1 GB of Android Build Support, and 630 MB of installer leftovers that UnitySetup moves to `/root/.local/share/Trash` instead of deleting. This branch deletes those leftovers, and CI now frees runner disk before building.
+- **Full Dockerfile, as in pull request #4** (pinned `3-jammy`, the repo's UnitySetup step with `--components=Unity,Android`). Every build step completed. In October the final image export ran out of the test machine's disk; on 2026-11-13 the pull request's CI run and a local run both built and exported the complete image (9.8 GB). The Unity layer is about 8.5 GB uncompressed: 6.3 GB of Editor and 2.2 GB of Android Build Support. UnitySetup also moves about 630 MB of installer leftovers to `/root/.local/share/Trash` instead of deleting them; pull request #4 deletes those, and CI now frees runner disk before building.
 
 - The current upstream desktop-lite script (feature v1.2.10, noVNC 1.6.0) builds and serves on 24.04 and 26.04.
 - `UnitySetup` is a GTK3 program. It only runs because the desktop script installs GTK3 first, so the Dockerfile's step order matters.
@@ -124,49 +125,58 @@ The original `.devcontainer` from `main` was run through `devcontainer build`, w
 | Files left behind | ❌ The generated env file, with the credentials in clear text, stays world-readable under the build host's `/tmp/devcontainercli-*/`. |
 | `runArgs` in the image's config | ❌ Not carried into image metadata, so consumers got a 64 MB `/dev/shm` and no init process. `forwardPorts` and `overrideCommand` are carried. |
 
-### 4.3 This branch's runtime activation
+### 4.3 Runtime activation (pull request #4)
 
-`.devcontainer` from this branch was run with `devcontainer up` against a stand-in image: the real devcontainers base plus fake `Unity` and `vncpasswd` binaries that record their arguments. Codespaces secrets were simulated with `--remote-env`.
+`.devcontainer` from pull request #4 was run with `devcontainer up` against a stand-in image: the real devcontainers base plus fake `Unity` and `vncpasswd` binaries that record their arguments. Codespaces secrets were simulated with `--remote-env`.
 
 | Check | Result |
 |---|---|
-| Activation when the container starts | ✅ Runs as the `vscode` user. The password reaches Unity as a single argument. The license file and log are mode 600, in a directory with mode 700. |
+| Activation when the container starts | ✅ Runs as the `vscode` user. The password reaches Unity as a single argument. The license file is mode 600, in a directory with mode 700. Unity's log is removed after a successful activation and kept (mode 600) after a failed one. |
 | Credentials in build or start-up logs | ✅ None. The feature has no options, and image metadata and history hold no secret. |
-| Restart | ✅ "A Unity license is already active", with no second activation. |
-| `unity-license return` / `status` | ✅ The seat is returned, and the status reflects it. |
-| No secrets set | ✅ The codespace still starts, with a message naming the missing secrets. `return` exits 1 with an explanation. |
+| Restart | ✅ "A Unity license file is already present", with no second activation. `unity-license activate --force` replaces the file and activates again; if that fails, the old file is put back. |
+| `unity-license return` / `status` | ✅ With the stand-in, the seat is returned and the status reflects it. `return` goes by Unity's log rather than its exit status: GameCI's logs of real seats and the Editor's own code show that the Editor exits with an error after it has returned a named-user license. The stand-in imitates that. |
+| No secrets set | ✅ The codespace still starts, with a message naming the missing secrets. `return` names the missing secrets and exits 1. |
 | `VNC_PASSWORD` | ✅ Applied at start (mode 600, owned by the desktop user). Without it, the image default is kept. |
 | `/dev/shm` and init | ✅ 6 GB and `--init`, from the consumer config. |
 
 A separate check against a real TigerVNC server (the repo's desktop layer) found that it offers only VNC password authentication (RFB security type 2). A `VNC_PASSWORD` set at runtime was accepted on the next connection without restarting the server, and the old password was rejected.
 
+On 2026-11-13 the same config was also run against the real image, built from this repository's Dockerfile, with made-up credentials. The real Editor ran and the activation failed, as it should:
+
+- the container still started, and `unity-license return` and `activate --force` reported the failure;
+- nothing secret appeared in the output or in Unity's log (mode 600);
+- `/dev/shm` was 6 GB, with an init process;
+- a `VNC_PASSWORD` set at start was accepted by the desktop's own VNC server, and the image's default password was rejected;
+- started by hand, the Editor's window reached Unity's "No valid Unity Editor license found" dialog.
+
 A real Unity activation was not tested (no Unity seat in this environment).
 
 ## 5. Defects
 
-Ordered by severity. "This branch" means it is fixed on `claude/trusting-ptolemy-3qobu9`.
+Ordered by severity. "PR #4" means it is fixed by [pull request #4](https://github.com/gblikas/unity-desktop-lite/pull/4). These defect numbers (D1-D20) are separate from the decision numbers (D0-D7) in the roadmap.
 
 | ID | Severity | Where | Problem | Fix | Status |
 |---|---|---|---|---|---|
-| D1 | Critical | .devcontainer/devcontainer.json:2, README.md:20 | The README's image is private, so nobody but the owner can follow the README (issue #3). It also has only a mutable `:latest` tag. | Do **not** make it public: Unity's terms grant no right to redistribute the Editor (see [§9](#9-constraints-any-next-step-must-respect)). Install the Editor from Unity per user instead ([roadmap](./roadmap.md)). Meanwhile the README gives a self-build workaround. | Workaround documented |
-| D2 | Critical | Dockerfile:1 | The unpinned base now gives Ubuntu 26.04: the build fails, and Unity 2022.3 cannot run there. | Pin to `mcr.microsoft.com/devcontainers/base:3-jammy`. | This branch |
-| D3 | High | local feature install.sh:47; devcontainer.json:5-8 | The Unity password (3 times per build) and serial were printed to the build/creation log, by `set -x` and by the dev container CLI's echo of feature options. | Credentials are no longer feature options; activation reads them at runtime. | This branch |
-| D4 | High | devcontainer.json:4-9; local feature | License activation ran at **image build time**. That contradicts GitHub's secrets model, cannot work with prebuilds (which get no user secrets), and would store the activated license, with a recoverable serial, in an image layer. With repo-level secrets it would share one person's seat with everyone. | Activate in `postStartCommand` from environment secrets, declared in a devcontainer.json `secrets` block. | This branch (tested with a stand-in) |
-| D5 | High | local feature install.sh:49-56 | Seats are never returned. `-returnlicense` in a fresh container is a no-op, and each new codespace or rebuild consumes an activation (a paid seat allows two machines). | `unity-license return`, documented My Seats cleanup, and one long-lived codespace per person. For teams, floating licenses. | Helper added; the user must run it |
-| D6 | Medium | devcontainer.json:8 | The "optional" `VNC_PASSWORD` was required: `${localEnv:VNC_PASSWORD}` becomes `""`, which overrides the feature's default and makes install.sh exit 1. | Read at runtime; the image default is used when unset. | This branch |
-| D7 | High | local feature install.sh:50-65; dev container CLI env file | Credentials were unquoted, so a password with a space was split into two arguments. Worse, the CLI writes feature options to an env file as `NAME="value"` without escaping and sources it, so `$(…)` in a password **ran as root** during the build (tested), and `"` broke the build. | Credentials are no longer feature options; all expansions are quoted. | This branch |
-| D8 | Medium | unity-2022/.../devcontainer.json:6 | `runArgs` (`--shm-size=6gb`, `--init`) are not part of image metadata, so consumers ran with a 64 MB `/dev/shm` and no init. | `"init": true` and `runArgs` in the consumer config. | This branch |
-| D9 | Medium | workflow | Only `:latest` is published, and only on push to `main`; tag and manual runs never publish. There was no `permissions` block, and new personal repos default to a read-only token. | `permissions` added in this branch, plus a manual re-tag option that keeps rollback points (the 2023 image is kept as `:2023-12`). Versioned `imageTag` still to do. | Partly fixed |
+| D1 | Critical | .devcontainer/devcontainer.json:2, README.md:20 | The README's image is private, so nobody but the owner can follow the README (issue #3). It also had only a mutable `:latest` tag; the December 2023 image is now tagged `:2023-12` as well. | Do **not** make it public: Unity's terms grant no right to redistribute the Editor (see [§9](#9-constraints-any-next-step-must-respect)). Install the Editor from Unity per user instead ([roadmap](./roadmap.md)). Meanwhile the README gives a self-build workaround. | Workaround documented |
+| D2 | Critical | Dockerfile:1 | The unpinned base now gives Ubuntu 26.04: the build fails, and Unity 2022.3 cannot run there. | Pin to `mcr.microsoft.com/devcontainers/base:3-jammy`. | PR #4 |
+| D3 | High | local feature install.sh:47; devcontainer.json:5-8 | The Unity password (3 times per build) and serial were printed to the build/creation log, by `set -x` and by the dev container CLI's echo of feature options. | Credentials are no longer feature options; activation reads them at runtime. | PR #4 |
+| D4 | High | devcontainer.json:4-9; local feature | License activation ran at **image build time**. That contradicts GitHub's secrets model, cannot work with prebuilds (which get no user secrets), and would store the activated license, with a recoverable serial, in an image layer. With repo-level secrets it would share one person's seat with everyone. | Activate in `postStartCommand` from environment secrets, declared in a devcontainer.json `secrets` block. | PR #4 (tested with a stand-in) |
+| D5 | High | local feature install.sh:49-56 | Seats are never returned. `-returnlicense` in a fresh container is a no-op, and each new codespace or rebuild may consume an activation (a paid seat allows two machines; but see D20). | `unity-license return`, documented My Seats cleanup, and one long-lived codespace per person. For teams, floating licenses. | Helper added; the user must run it |
+| D6 | Medium | devcontainer.json:8 | The "optional" `VNC_PASSWORD` was required: `${localEnv:VNC_PASSWORD}` becomes `""`, which overrides the feature's default and makes install.sh exit 1. | Read at runtime; the image default is used when unset. | PR #4 |
+| D7 | High | local feature install.sh:50-65; dev container CLI env file | Credentials were unquoted, so a password with a space was split into two arguments. Worse, the CLI writes feature options to an env file as `NAME="value"` without escaping and sources it, so `$(…)` in a password **ran as root** during the build (tested), and `"` broke the build. | Credentials are no longer feature options; all expansions are quoted. | PR #4 |
+| D8 | Medium | unity-2022/.../devcontainer.json:6 | `runArgs` (`--shm-size=6gb`, `--init`) are not part of image metadata, so consumers ran with a 64 MB `/dev/shm` and no init. | `"init": true` and `runArgs` in the consumer config. | PR #4 |
+| D9 | Medium | workflow | Only `:latest` is published, and only on push to `main`; tag and manual runs never publish. There was no `permissions` block, and new personal repos default to a read-only token. | `permissions` added in pull request #4, plus a manual re-tag option that keeps rollback points (the 2023 image is kept as `:2023-12`). Versioned `imageTag` still to do. | Partly fixed |
 | D10 | Medium | workflow:40 | `git diff HEAD^ HEAD` only inspects the last commit, cannot be forced, and treats git errors as "changed". There is no schedule for base-image updates. | Path filters or `github.event.before`, a `force` input, a weekly schedule. | Open |
-| D11 | Low | workflow | Deprecated `::set-output`; node20-era action majors. | `$GITHUB_OUTPUT`, `checkout@v7`, `login-action@v4`. | This branch |
+| D11 | Low | workflow | Deprecated `::set-output`; node20-era action majors. | `$GITHUB_OUTPUT`, `checkout@v7`, `login-action@v4`. | PR #4 |
 | D12 | Low | unity-install.sh, install.sh | Downloads are executed as root without checksums; action tags are mutable. | Verify md5/sha256 and pin actions by SHA. | Open |
-| D13 | Low | unity-install.sh:25 | The Android module (0.66 GB download, 1.32 GB installed) is installed by default but is not needed to view scenes. | Editor-only by default. | Open |
+| D13 | Low | unity-install.sh:25 | The Android module (0.66 GB download, 2.2 GB in the image) is installed by default but is not needed to view scenes. | Editor-only by default. | Open |
 | D14 | Low | unity-2022/.../install.sh | The vendored desktop script is frozen at v1.0.7. The desktop only starts for consumers because `overrideCommand: false` survives in the image label. | Use `ghcr.io/devcontainers/features/desktop-lite:1`. | Open |
-| D15 | Low | local feature install.sh:25 | The VNC password was baked into the image and world-readable. TigerVNC uses only the first 8 characters and stores it reversibly. | Set at runtime, mode 600, owned by the desktop user. The 8-character limit remains (TigerVNC). | This branch |
-| D16 | Low | README.md | Inaccurate or stale statements and typos. | Corrected; known issues and a self-build workaround added. | This branch |
-| D17 | Low | unity-install.sh:25 | `yes |` accepts Unity's license agreement on the user's behalf. | Let each user accept Unity's terms, for example via an explicit opt-in. | Open |
+| D15 | Low | local feature install.sh:25 | The VNC password was baked into the image and world-readable. TigerVNC uses only the first 8 characters and stores it reversibly. | Set at runtime, mode 600, owned by the desktop user. The 8-character limit remains (TigerVNC). | PR #4 |
+| D16 | Low | README.md | Inaccurate or stale statements and typos. | Corrected; known issues and a self-build workaround added. | PR #4 |
+| D17 | Low | unity-install.sh:25 | `yes \|` accepts Unity's license agreement on the user's behalf. | Let each user accept Unity's terms, for example via an explicit opt-in. | Open |
 | D18 | Low | Dockerfile (`VNC_RESOLUTION=1440x768x16`) | The desktop uses 16-bit colour, which bands gradients and is unsuitable for judging art. | 24-bit (`…x24`), after measuring the bandwidth cost. | Open |
-| D19 | Medium | unity-install.sh; workflow | UnitySetup leaves about 630 MB of installer files in `/root/.local/share/Trash`. The Unity layer (~8.7 GB uncompressed) needs roughly twice that free disk to build and export, more than a standard GitHub runner's ~14 GB. | Delete the leftovers in the same `RUN`; free runner disk before building. | This branch |
+| D19 | Medium | unity-install.sh; workflow | UnitySetup leaves about 630 MB of installer files in `/root/.local/share/Trash`. The Unity layer (about 8.5 GB uncompressed without them) needs roughly twice that free disk to build and export. GitHub documents 14 GB of disk for its standard runners, although the runner that built pull request #4 had 110 GB free after the cleanup. | Delete the leftovers in the same `RUN`; free runner disk before building. The step prints the free space before and after, to show whether it is still needed. | PR #4 |
+| D20 | Medium | Dockerfile (desktop layer) | The image contains `/var/lib/dbus/machine-id`, created when the image is built, and its `/etc/machine-id` is empty. Unity's licensing client takes its machine id from that file, so every container started from the same image reports the same machine (seen in two containers on 2026-11-13; the December 2023 image was built the same way). How Unity's servers treat this is not known: several codespaces may count as one machine, and a return in one may end the activation of the others. It also bears on [§9](#9-constraints-any-next-step-must-respect)'s point about reusing machine identities. | Decide first (roadmap, seat-accounting spike). To give each container its own identity, delete the file at the end of the build; dbus creates a new one when the desktop starts. | Open |
 
 ## 6. Dependency freshness
 
@@ -177,9 +187,9 @@ Ordered by severity. "This branch" means it is fixed on `claude/trusting-ptolemy
 | noVNC / websockify | 1.2.0 / 0.10.0 | 1.7.0 / 0.13.0 (feature default 1.6.0) | Comes with the feature. |
 | Unity | 2022.3.11f1 (`d00248457e15`) | 2022.3.62f3 is the last public 2022.3; later 2022.3 patches are Enterprise/Industry-only. **6000.3.27f1 LTS** (supported to Dec 2027); 6000.6.7f1 (current Update release); 6000.0 LTS public support ends Oct 2026. | Install the Editor version the project uses (roadmap Phase 1). Test 6000.3 LTS and 2022.3.62f3. |
 | Unity installer | `UnitySetup-<ver>` (GTK3 binary, undocumented; `yes \|` accepts the license) | `LinuxEditorInstaller/Unity-<ver>.tar.xz` (documented, md5 published), or Unity's own CLI `unity install <ver> --changeset …` (beta) | Prefer Unity's own tooling; fall back to the documented tarball. |
-| Actions | `checkout@v4`, `login-action@v3`, `ci@v0.3` | `checkout@v7`, `login-action@v4`, `ci@v0.3` | Updated here; add Dependabot. |
-| VS Code extensions | `vscode-docker`, `GitHub.copilot` | Container Tools replaced the Docker extension; Copilot Chat is built into VS Code | Removed here: the image has no Docker, and Copilot is built in. |
-| Licensing tooling | Editor `-serial -username -password`, at build time | Same flags (still documented), plus the Unity CLI `unity license activate` (beta) | Runtime activation in this branch. |
+| Actions | `checkout@v4`, `login-action@v3`, `ci@v0.3` | `checkout@v7`, `login-action@v4`, `ci@v0.3` | Updated in pull request #4; add Dependabot. |
+| VS Code extensions | `vscode-docker`, `GitHub.copilot` | Container Tools replaced the Docker extension; Copilot Chat is built into VS Code | Removed in pull request #4: the image has no Docker, and Copilot is built in. |
+| Licensing tooling | Editor `-serial -username -password`, at build time | Same flags (still documented), plus the Unity CLI `unity license activate` (beta) | Runtime activation in pull request #4. |
 
 ## 7. What changed since 2023
 
@@ -310,7 +320,7 @@ The verdict is relative to this project's goal: let reviewers and PMs inspect a 
   - A public image containing the Editor, or a public-repo prebuild that copies one to every visitor, is outside the grant.
   - A seat holder's own codespace is the reading most consistent with the terms, but it is still worth confirming with Unity.
 - **Seats.** A named or serial seat covers one person, two machines and one running instance.
-  - A codespace counts as a machine.
+  - A codespace should count as a machine. At present every container started from one image reports the same machine id (defect D20).
   - Nobody should share the desktop with anyone who lacks a seat.
   - Do not reuse one machine identity across codespaces to save activations; that may count as circumventing license limits (§17.2(d), §17.2(i)).
   - Floating licenses (Enterprise/Industry) suit teams. The codespace must be able to reach the on-premises Licensing Server, which usually means a VPN.
