@@ -59,6 +59,10 @@ Option A answers all four asks within a fixed budget. B's extra pieces depend on
   - The full Dockerfile (UnitySetup with Unity + Android) now builds end to end on it; tested up to image export, which ran out of this sandbox's disk.
 - [x] **No Trash leftovers in the image.** UnitySetup moves its temporary files (~630 MB) to the Trash, so they are now deleted in the same `RUN`.
 - [x] **CI frees runner disk before building.** The Unity layer is ~8.7 GB uncompressed.
+- [x] **Rollback point, and proof the workflow can write to the package.** Run manually with `retag_to`, the image workflow now copies a tag of the published image instead of building.
+  - A run on 2026-11-13 tagged the December 2023 image as `:2023-12`. Both tags are on the same digest (`sha256:f03607d7…`).
+  - That run used the workflow's own token, so it also showed that the token may write to the package.
+  - To roll back after a publish, run the workflow manually with `retag_from=2023-12` and `retag_to=latest`.
 - [x] **Runtime license activation.** The local feature now installs a `unity-license` helper and runs it in `postStartCommand`, reading `UNITY_*` from the environment.
   - Credentials are no longer feature options, so:
     - nothing reaches the build log;
@@ -74,11 +78,10 @@ Option A answers all four asks within a fixed budget. B's extra pieces depend on
 ### To do
 
 0. **Confirm which Unity license you can test with.** A Pro seat, or Personal? Every later gate depends on it. If you have no seat this flow can activate, say so in the README rather than promise paid-seat support.
-1. **Merge safely.**
-   - Open a PR from this branch. The `pull_request` run builds the full image but cannot publish (`push: filter` only publishes on pushes to `main`).
-   - In the package settings, check that *Manage Actions access* lists this repository with *Write*. Nobody can tell whether the 2023 workflow ever published, because its run history has been deleted.
-   - Tag the current image as a rollback point: `docker buildx imagetools create -t ghcr.io/gblikas/unity-desktop-lite/unity-2022/2022.3.11f1:2023-12 ghcr.io/gblikas/unity-desktop-lite/unity-2022/2022.3.11f1:latest`.
-   - Merge with *squash* or a *merge commit*. With *rebase*, the `HEAD^` change check may skip the rebuild.
+1. **Merge.**
+   - Wait for the pull request's build check. The `pull_request` run builds the full image but cannot publish (`push: filter` only publishes on pushes to `main`).
+   - Use *Squash and merge*, the only method this repository allows. A squash triggers the rebuild; the `HEAD^` change check would skip it after a rebase-merge.
+   - Afterwards, check that the run on `main` published the new image. If it misbehaves, roll back as described above.
 2. **Reply on issue #3.** The package is private. The README's self-build option is the workaround, and an install-from-Unity option is planned. **Do not make the package public**: Unity's terms grant no right to redistribute the Editor, and public visibility cannot be undone.
 3. **Time-boxed spikes in a real codespace** (about a day each), which decide gate G1:
    - **(a) License.** Try 2022.3.62f3 and 6000.3 with a Pro serial, a named-user seat (`-serial` without a key) and Personal.
@@ -270,7 +273,7 @@ These still need a real codespace or Unity's answer:
 
 ## Suggested first week
 
-1. Spend 1-2 hours on the merge steps above: PR run, package access, rollback tag, squash merge. Then reply on #3.
+1. Merge once the pull request's build check is green, and check the publish run on `main`. Then reply on #3.
 2. License spike (about 1 day).
 3. Time-to-first-scene spike (about 1 day).
 4. Decide D0, D6 and D7.
