@@ -115,6 +115,26 @@ set_vnc_password() {
     rm -f "${tmp}"
 }
 
+# restore_licenses <folder>: puts the license files that were set aside in <folder> back and
+# removes the folder. If a file cannot be moved, the folder is kept and named.
+restore_licenses() {
+    local file target restored=yes
+    for file in "$1"/*; do
+        [ -e "${file}" ] || continue
+        case "${file}" in
+            *.xml) target="${NAMED_USER_LICENSES}/" ;;
+            *) target="${SERIAL_LICENSE}" ;;
+        esac
+        mv -f "${file}" "${target}" || restored=no
+    done
+    if [ "${restored}" = yes ]; then
+        rmdir "$1"
+        log "The previous license files were put back."
+    else
+        log "Could not put back all previous license files; they are kept in $1."
+    fi
+}
+
 # activate [--force]: with --force, replaces the license files that are already present.
 activate() {
     set_vnc_password
@@ -139,10 +159,20 @@ activate() {
     mkdir -p "$(dirname "${SERIAL_LICENSE}")" "${NAMED_USER_LICENSES}" "${LOG_DIR}"
     # Only reached with a license file when --force was given. Start as a new container would,
     # but keep the old files until the new activation has worked.
-    local replaced=""
+    local replaced="" file
     if has_license; then
-        replaced="$(mktemp -d "${LOG_DIR}/replaced.XXXXXX")"
-        mv -f "${SERIAL_LICENSE}" "${NAMED_USER_LICENSES}"/*.xml "${replaced}/" 2> /dev/null
+        if ! replaced="$(mktemp -d "${LOG_DIR}/replaced.XXXXXX")"; then
+            log "Could not set the current license files aside; nothing was changed."
+            return 0
+        fi
+        for file in "${SERIAL_LICENSE}" "${NAMED_USER_LICENSES}"/*.xml; do
+            [ -e "${file}" ] || continue
+            if ! mv -f "${file}" "${replaced}/"; then
+                log "Could not set ${file} aside; nothing was activated."
+                restore_licenses "${replaced}"
+                return 0
+            fi
+        done
     fi
     local args=(-serial)
     # Without a serial key, -serial activates a named-user (assigned) license.
@@ -157,10 +187,10 @@ activate() {
     else
         log "Unity license activation failed; see ${LOG_DIR}/activate.log (delete it when done, it may contain your account details)."
         if [ -n "${replaced}" ]; then
+            # Whatever the failed attempt left behind is not a license.
             rm -f "${SERIAL_LICENSE}" "${NAMED_USER_LICENSES}"/*.xml
-            [ -e "${replaced}/${SERIAL_LICENSE##*/}" ] && mv -f "${replaced}/${SERIAL_LICENSE##*/}" "${SERIAL_LICENSE}"
-            mv -f "${replaced}"/*.xml "${NAMED_USER_LICENSES}/" 2> /dev/null
-            log "The previous license files were put back."
+            restore_licenses "${replaced}"
+            replaced=""
         fi
     fi
     [ -n "${replaced}" ] && rm -rf "${replaced}"
