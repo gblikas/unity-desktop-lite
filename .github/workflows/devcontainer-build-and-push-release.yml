@@ -3,12 +3,12 @@ name: devcontainer build and push release
 on:
   workflow_dispatch:
     inputs:
-      retag_to:
-        description: "Copy a tag of the published image instead of building: the tag to create or move (2023-12 keeps a rollback point, latest rolls back)"
-        default: ""
       retag_from:
-        description: "The tag to copy when retag_to is set"
-        default: "latest"
+        description: "retag_from - leave both fields empty to build. To copy a published tag instead, the tag to copy: latest (to keep a rollback point) or a rollback point such as 2023-12 (to roll back)"
+        default: ""
+      retag_to:
+        description: "retag_to - the tag to give that image: a new name such as 2026-11 (to keep a rollback point) or latest (to roll back)"
+        default: ""
   pull_request:
     branches:
       - "main"
@@ -24,6 +24,15 @@ on:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    # A build takes about 18 minutes. A run that hangs must not hold the group below for hours.
+    timeout-minutes: 60
+    # Runs that write to the registry (pushes to main, and manual re-tags) run one at a time, and
+    # a run that is in progress always finishes first. So a rollback cannot be overwritten by a
+    # publish that was already running. Every other run only builds and gets a group of its own.
+    concurrency:
+      group: ${{ ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && (inputs.retag_from != '' || inputs.retag_to != ''))) && format('registry-{0}', matrix.directory) || format('{0}-{1}', github.run_id, matrix.directory) }}
+      cancel-in-progress: false
+      queue: max
     permissions:
       contents: read
       packages: write
@@ -46,19 +55,54 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: ${{ matrix.directory }} - copy a tag of the published image
         id: retag
-        if: github.event_name == 'workflow_dispatch' && inputs.retag_to != ''
+        if: github.event_name == 'workflow_dispatch' && (inputs.retag_from != '' || inputs.retag_to != '')
         env:
           IMAGE: ghcr.io/${{ github.repository }}/${{ matrix.directory }}
           RETAG_FROM: ${{ inputs.retag_from }}
           RETAG_TO: ${{ inputs.retag_to }}
         run: |
-          # Keeps a rollback point (latest -> 2023-12) or rolls back (2023-12 -> latest) without rebuilding.
-          docker buildx imagetools create --prefer-index=false --tag "${IMAGE}:${RETAG_TO}" "${IMAGE}:${RETAG_FROM}"
-          from="$(docker buildx imagetools inspect "${IMAGE}:${RETAG_FROM}" --format '{{.Manifest.Digest}}')"
-          to="$(docker buildx imagetools inspect "${IMAGE}:${RETAG_TO}" --format '{{.Manifest.Digest}}')"
-          echo "${IMAGE}:${RETAG_FROM} is ${from}"
-          echo "${IMAGE}:${RETAG_TO} is ${to}"
-          [ "${from}" = "${to}" ]
+          # Keeps a rollback point (latest -> 2026-11) or rolls back (2023-12 -> latest) without rebuilding.
+          fail() {
+            echo "::error::$*"
+            exit 1
+          }
+          digest() {
+            docker buildx imagetools inspect "$1" --format '{{.Manifest.Digest}}'
+          }
+
+          [ -n "${RETAG_FROM}" ] && [ -n "${RETAG_TO}" ] || fail "Set both retag_from and retag_to (got '${RETAG_FROM}' and '${RETAG_TO}')."
+          [[ "${RETAG_FROM}" =~ ^([A-Za-z0-9_][A-Za-z0-9_.-]{0,127}|sha256:[0-9a-f]{64})$ ]] || fail "retag_from must be a tag name or a sha256: digest, not '${RETAG_FROM}'."
+          [[ "${RETAG_TO}" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]] || fail "retag_to must be a tag name, not '${RETAG_TO}'."
+          [ "${RETAG_FROM}" != "${RETAG_TO}" ] || fail "retag_from and retag_to are both '${RETAG_TO}', so there is nothing to copy. To roll back, retag_from is the rollback point and retag_to is latest."
+          # retag_from may also be a digest (sha256:...), as printed by earlier runs of this step.
+          case "${RETAG_FROM}" in
+            sha256:*) source="${IMAGE}@${RETAG_FROM}" ;;
+            *) source="${IMAGE}:${RETAG_FROM}" ;;
+          esac
+          target="${IMAGE}:${RETAG_TO}"
+
+          from="$(digest "${source}")" || fail "Cannot read ${source}."
+          echo "${source} is ${from}"
+          if previous="$(digest "${target}" 2> "${RUNNER_TEMP}/inspect.err")"; then
+            echo "${target} was ${previous}"
+          elif grep -q -F -- "${target}: not found" "${RUNNER_TEMP}/inspect.err"; then
+            previous=""
+            echo "${target} does not exist yet"
+          else
+            cat "${RUNNER_TEMP}/inspect.err"
+            fail "Cannot tell whether ${target} already exists."
+          fi
+          if [ "${previous}" = "${from}" ]; then
+            echo "${target} is already that image; nothing to do."
+            exit 0
+          fi
+          # Only latest may move: a rollback point that moved would no longer be one.
+          [ -z "${previous}" ] || [ "${RETAG_TO}" = "latest" ] || fail "${target} already exists and is a different image. Choose a tag name that is not in use."
+
+          docker buildx imagetools create --prefer-index=false --tag "${target}" "${source}"
+          to="$(digest "${target}")"
+          echo "${target} is ${to}"
+          [ "${from}" = "${to}" ] || fail "${target} is ${to}, expected ${from}."
       - name: ${{ matrix.directory }} - check diff changes
         id: check_diff_changes
         if: steps.retag.outcome == 'skipped'
@@ -74,7 +118,8 @@ jobs:
       - name: free disk space
         if: steps.check_diff_changes.outputs.changed == 'true'
         run: |
-          # The Unity layer is about 8.7 GB uncompressed and needs roughly twice that to build and export.
+          # The Unity layer is about 8.5 GB uncompressed and needs roughly twice that to build and export.
+          df -h /
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
           docker image prune --all --force
           df -h /
