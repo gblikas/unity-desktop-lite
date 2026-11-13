@@ -24,3 +24,7 @@ chmod +x ${UNITY_SETUP_TMP}
 mkdir -p ${UNITY_INSTALL_DIR}
 yes | ${UNITY_SETUP_TMP} --unattended --install-location=${UNITY_INSTALL_DIR} --components=Unity,Android
 chmod -R a+rx ${UNITY_INSTALL_DIR}/Editor/Unity
+
+# UnitySetup moves its temporary installer files to the Trash instead of deleting them
+# (about 630 MB for the Android module); keep them out of the image layer.
+rm -rf "${UNITY_SETUP_TMP}" "${HOME}/.local/share/Trash"
