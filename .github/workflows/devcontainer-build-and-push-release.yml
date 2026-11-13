@@ -1,7 +1,14 @@
 name: devcontainer build and push release
 
-on: 
+on:
   workflow_dispatch:
+    inputs:
+      retag_to:
+        description: "Copy a tag of the published image instead of building: the tag to create or move (2023-12 keeps a rollback point, latest rolls back)"
+        default: ""
+      retag_from:
+        description: "The tag to copy when retag_to is set"
+        default: "latest"
   pull_request:
     branches:
       - "main"
@@ -37,8 +44,24 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: ${{ matrix.directory }} - copy a tag of the published image
+        id: retag
+        if: github.event_name == 'workflow_dispatch' && inputs.retag_to != ''
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}/${{ matrix.directory }}
+          RETAG_FROM: ${{ inputs.retag_from }}
+          RETAG_TO: ${{ inputs.retag_to }}
+        run: |
+          # Keeps a rollback point (latest -> 2023-12) or rolls back (2023-12 -> latest) without rebuilding.
+          docker buildx imagetools create --prefer-index=false --tag "${IMAGE}:${RETAG_TO}" "${IMAGE}:${RETAG_FROM}"
+          from="$(docker buildx imagetools inspect "${IMAGE}:${RETAG_FROM}" --format '{{.Manifest.Digest}}')"
+          to="$(docker buildx imagetools inspect "${IMAGE}:${RETAG_TO}" --format '{{.Manifest.Digest}}')"
+          echo "${IMAGE}:${RETAG_FROM} is ${from}"
+          echo "${IMAGE}:${RETAG_TO} is ${to}"
+          [ "${from}" = "${to}" ]
       - name: ${{ matrix.directory }} - check diff changes
         id: check_diff_changes
+        if: steps.retag.outcome == 'skipped'
         run: |
           if git diff --quiet HEAD^ HEAD -- ${{ matrix.directory }}; then
             echo "[${{ matrix.directory }}] didn't find changes"
